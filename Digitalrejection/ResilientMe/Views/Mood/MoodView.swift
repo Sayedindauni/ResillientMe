@@ -567,11 +567,20 @@ struct MoodView: View {
                                 Button(action: {
             // Generate recommendations based on mood and trigger
             if let selectedMood = selectedMood {
-                recommendedStrategies = CopingStrategies.recommendFor(
-                    mood: selectedMood,
-                    trigger: rejectionTrigger.isEmpty ? nil : rejectionTrigger
-                )
-                showingCopingStrategies = true
+                // Use our new library for recommendations
+                let isStrongReaction = moodIntensity >= 4
+                
+                if isStrongReaction {
+                    // For strong reactions, show full library with filtered strategies
+                    showingCopingStrategies = true
+                } else {
+                    // For milder reactions, use basic recommendations
+                    recommendedStrategies = CopingStrategies.recommendFor(
+                        mood: selectedMood,
+                        trigger: rejectionTrigger.isEmpty ? nil : rejectionTrigger
+                    )
+                    showingCopingStrategies = true
+                }
             }
         }) {
             HStack {
@@ -591,19 +600,27 @@ struct MoodView: View {
     
     // Coping strategies sheet view
     private var copingStrategiesView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header section
-            copingStrategiesHeader
-            
-            // Content section
-            copingStrategiesContent
-            
-            // Journal prompt section
-            journalPromptSection
+        VStack {
+            // For strong emotional reactions (intensity >= 4), show the full library view
+            if moodIntensity >= 4 && selectedMood != nil {
+                CopingStrategiesLibraryView()
+            } else {
+                // For milder reactions, show the simpler recommendations
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header section
+                    copingStrategiesHeader
+                    
+                    // Content section
+                    copingStrategiesContent
+                    
+                    // Journal prompt section
+                    journalPromptSection
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(AppLayout.cornerRadius)
+            }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(AppLayout.cornerRadius)
     }
     
     // Header for coping strategies
@@ -1363,11 +1380,26 @@ struct MoodView: View {
             return
         }
         
-        // Use AI-powered coping strategies
-        copingStrategies = moodAnalysisEngine.getCopingStrategiesForMood(
-            selectedMood, 
-            trigger: isRejectionRelated ? rejectionTrigger : nil
-        )
+        // Detect strong emotional reactions
+        let isStrongReaction = moodIntensity >= 4
+        
+        if isStrongReaction {
+            // For strong reactions, get strategies from our library
+            let libraryStrategies = CopingStrategiesLibrary.shared.recommendStrategies(
+                for: selectedMood,
+                intensity: moodIntensity,
+                trigger: isRejectionRelated ? rejectionTrigger : nil
+            )
+            
+            // Convert to simple string format for backward compatibility
+            copingStrategies = CopingStrategiesLibrary.getSimpleStrategyStrings(from: libraryStrategies)
+        } else {
+            // For milder reactions, use AI-powered or fallback strategies
+            copingStrategies = moodAnalysisEngine.getCopingStrategiesForMood(
+                selectedMood, 
+                trigger: isRejectionRelated ? rejectionTrigger : nil
+            )
+        }
         
         // Clear any previously selected strategy
         selectedCopingStrategy = nil
