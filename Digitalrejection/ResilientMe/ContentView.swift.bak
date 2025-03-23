@@ -34,7 +34,7 @@ struct ContentView: View {
     @State private var dailyAffirmation = AppCopy.randomAffirmation()
     
     // Persistent data storage for rejection entries
-    @State private var rejectionEntries: [MoodData] = []
+    @State private var rejectionEntries: [MoodEntry] = []
     
     // State for journal prompts coming from mood tracking
     @State private var showJournalWithPrompt = false
