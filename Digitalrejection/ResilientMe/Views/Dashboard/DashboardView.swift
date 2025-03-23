@@ -80,6 +80,15 @@ struct Resource: Identifiable {
     let title: String
     let description: String
     let type: ResourceType
+    
+    enum ResourceType {
+        case article
+        case video
+        case podcast
+        case community
+        case collection
+        case exercise
+    }
 }
 
 struct DashboardView: View {
@@ -106,9 +115,9 @@ struct DashboardView: View {
     ]
     
     let resources = [
-        Resource(icon: "doc.text", title: "Understanding Digital Rejection", description: "Why online rejection hits differently", type: .article),
-        Resource(icon: "person.2", title: "Community Stories", description: "How others overcame rejection", type: .community),
-        Resource(icon: "books.vertical", title: "Resilience Library", description: "Curated resources for building strength", type: .collection)
+        Resource(icon: "doc.text", title: "Understanding Digital Rejection", description: "Why online rejection hits differently", type: Resource.ResourceType.article),
+        Resource(icon: "person.2", title: "Community Stories", description: "How others overcame rejection", type: Resource.ResourceType.community),
+        Resource(icon: "books.vertical", title: "Resilience Library", description: "Curated resources for building strength", type: Resource.ResourceType.collection)
     ]
     
     var body: some View {
@@ -490,6 +499,8 @@ struct ResourceCard: View {
             return AppColors.accent1
         case .collection:
             return AppColors.accent2
+        case .exercise:
+            return AppColors.accent3
         }
     }
     
@@ -505,6 +516,8 @@ struct ResourceCard: View {
             return "person.2"
         case .collection:
             return "books.vertical"
+        case .exercise:
+            return "figure.mind.and.body"
         }
     }
     
@@ -520,6 +533,8 @@ struct ResourceCard: View {
             return "Community"
         case .collection:
             return "Collection"
+        case .exercise:
+            return "Exercise"
         }
     }
     

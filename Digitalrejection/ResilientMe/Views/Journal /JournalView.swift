@@ -43,6 +43,22 @@ struct JournalView: View {
     @State private var filterOption: FilterOption = .all
     @State private var journalEntries: [JournalEntryModel] = SampleData.journalEntries
     
+    // Properties to handle mood tracking integration
+    var initialPromptData: [String: Any]?
+    var showNewEntryOnAppear: Bool
+    
+    // Initialize without parameters for backward compatibility
+    init() {
+        self.initialPromptData = nil
+        self.showNewEntryOnAppear = false
+    }
+    
+    // Initialize with prompt data for mood tracking integration
+    init(initialPromptData: [String: Any]?, showNewEntryOnAppear: Bool) {
+        self.initialPromptData = initialPromptData
+        self.showNewEntryOnAppear = showNewEntryOnAppear
+    }
+    
     private var filteredEntries: [JournalEntryModel] {
         var entries = journalEntries
         
@@ -100,7 +116,11 @@ struct JournalView: View {
             .sheet(isPresented: $showingNewEntry) {
                 JournalEntryEditorView(
                     isNewEntry: true,
-                    initialPrompt: AppCopy.randomJournalPrompt()
+                    initialPrompt: getPromptContent(),
+                    initialTitle: getPromptTitle(),
+                    initialTags: getPromptTags(),
+                    initialMood: getPromptMood(),
+                    initialMoodIntensity: getPromptMoodIntensity()
                 ) { newEntry in
                     // Add new entry to journal
                     if let newEntry = newEntry {
@@ -119,6 +139,16 @@ struct JournalView: View {
                     }
                 }
                 .withDynamicTypeSize()
+            }
+            .onAppear {
+                // If showNewEntryOnAppear is true, we should trigger a new entry
+                // with the provided prompt data
+                if showNewEntryOnAppear, initialPromptData != nil {
+                    // Slight delay to ensure view is ready
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showingNewEntry = true
+                    }
+                }
             }
         }
     }
@@ -251,6 +281,62 @@ struct JournalView: View {
         .frame(maxWidth: .infinity)
         .padding()
     }
+    
+    // MARK: - Helper Methods for Prompt Data
+    
+    // Get the prompt content from initialPromptData
+    private func getPromptContent() -> String {
+        if let promptData = initialPromptData, let prompt = promptData["prompt"] as? String {
+            return prompt
+        }
+        return AppCopy.randomJournalPrompt()
+    }
+    
+    // Get the title from initialPromptData
+    private func getPromptTitle() -> String {
+        if let promptData = initialPromptData, let title = promptData["title"] as? String {
+            return title
+        }
+        return ""
+    }
+    
+    // Get suggested tags from initialPromptData
+    private func getPromptTags() -> [String] {
+        if let promptData = initialPromptData, let tags = promptData["tags"] as? [String] {
+            return tags
+        }
+        return []
+    }
+    
+    // Get mood from initialPromptData
+    private func getPromptMood() -> Mood? {
+        if let promptData = initialPromptData, let moodString = promptData["mood"] as? String {
+            // Map the mood string to Mood enum if possible
+            if moodString == "Happy" || moodString == "Excited" || moodString == "Proud" {
+                return .joyful
+            } else if moodString == "Calm" {
+                return .content
+            } else if moodString == "Sad" || moodString == "Discouraged" {
+                return .sad
+            } else if moodString == "Anxious" || moodString == "Overwhelmed" {
+                return .stressed
+            } else if moodString == "Angry" || moodString == "Frustrated" {
+                return .frustrated
+            } else if moodString == "Neutral" {
+                return .neutral
+            }
+        }
+        return nil
+    }
+    
+    // Get mood intensity from initialPromptData
+    private func getPromptMoodIntensity() -> Double {
+        if let promptData = initialPromptData, let intensity = promptData["moodIntensity"] as? Int {
+            // Convert 1-5 scale to 1-10 scale
+            return Double(intensity) * 2
+        }
+        return 5.0
+    }
 }
 
 // MARK: - Supporting Views
@@ -380,19 +466,52 @@ struct TagView: View {
 struct JournalEntryEditorView: View {
     let isNewEntry: Bool
     let initialPrompt: String
+    let initialTitle: String
+    let initialTags: [String]
+    let initialMood: Mood?
+    let initialMoodIntensity: Double
     let onSave: (JournalEntryModel?) -> Void
     
-    @State private var title = ""
-    @State private var content = ""
+    @State private var title: String
+    @State private var content: String
     @State private var selectedTags: [String] = []
     @State private var selectedMood: Mood?
-    @State private var moodIntensity: Double = 5
+    @State private var moodIntensity: Double
     @State private var showingPrompt = true
     @State private var showingTagPicker = false
     @State private var showingMoodPicker = false
     @Environment(\.dismiss) private var dismiss
     
     private let availableTags = ["Rejection", "Insight", "Gratitude", "Habit", "Growth"]
+    
+    // Initialize state with initial values
+    init(isNewEntry: Bool, initialPrompt: String, initialTitle: String = "", initialTags: [String] = [], initialMood: Mood? = nil, initialMoodIntensity: Double = 5.0, onSave: @escaping (JournalEntryModel?) -> Void) {
+        self.isNewEntry = isNewEntry
+        self.initialPrompt = initialPrompt
+        self.initialTitle = initialTitle
+        self.initialTags = initialTags
+        self.initialMood = initialMood
+        self.initialMoodIntensity = initialMoodIntensity
+        self.onSave = onSave
+        
+        // Initialize state
+        _title = State(initialValue: initialTitle)
+        _content = State(initialValue: "") // We'll set this separately if coming from a prompt
+        _selectedTags = State(initialValue: initialTags)
+        _selectedMood = State(initialValue: initialMood)
+        _moodIntensity = State(initialValue: initialMoodIntensity)
+        
+        // Show tag picker if initial tags are provided
+        _showingTagPicker = State(initialValue: !initialTags.isEmpty)
+        
+        // Show mood picker if mood is provided
+        _showingMoodPicker = State(initialValue: initialMood != nil)
+    }
+    
+    // Computed property to determine if save button should be enabled
+    private var isSaveButtonEnabled: Bool {
+        return !title.isEmpty && !content.isEmpty
+    }
     
     var body: some View {
         NavigationView {
@@ -401,7 +520,7 @@ struct JournalEntryEditorView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         // Writing prompt card (collapsible)
-                        if showingPrompt {
+                        if showingPrompt && !initialPrompt.isEmpty {
                             promptCard
                         }
                         
@@ -616,16 +735,22 @@ struct JournalEntryEditorView: View {
                         }
                     }
                     .padding()
+                    .onAppear {
+                        // If we have an initial prompt and this is a new entry,
+                        // automatically populate the content with a starter text
+                        if !initialPrompt.isEmpty && isNewEntry && content.isEmpty {
+                            content = "Prompt: \(initialPrompt)\n\nMy thoughts:\n"
+                        }
+                    }
                 }
             }
             .background(AppColors.background)
-            .navigationTitle(isNewEntry ? "New Entry" : "Edit Entry")
+            .navigationTitle(isNewEntry ? "New Journal Entry" : "Edit Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
-                        onSave(nil)
                     }
                 }
                 
@@ -633,93 +758,67 @@ struct JournalEntryEditorView: View {
                     Button("Save") {
                         saveEntry()
                     }
-                    .disabled(title.isEmpty || content.isEmpty)
+                    .font(AppTextStyles.button)
+                    .foregroundColor(isSaveButtonEnabled ? AppColors.primary : AppColors.textLight)
+                    .disabled(!isSaveButtonEnabled)
                 }
             }
         }
     }
     
-    // MARK: - Prompt Card
-    
     private var promptCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(AppColors.accent1)
-                    .font(.system(size: 16))
-                
-                Text("Journal Prompt")
+                Text("Writing Prompt")
                     .font(AppTextStyles.h4)
                     .foregroundColor(AppColors.textDark)
                 
                 Spacer()
                 
-                Button(action: { 
+                Button(action: {
                     withAnimation {
                         showingPrompt = false
                     }
                 }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppColors.textMedium)
-                        .padding(8)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.textLight)
                 }
-                .withMinTouchArea()
+                .makeAccessible(
+                    label: "Close prompt",
+                    hint: "Hide the writing prompt"
+                )
             }
             
             Text(initialPrompt)
                 .font(AppTextStyles.body1)
-                .foregroundColor(AppColors.textMedium)
-                .fixedSize(horizontal: false, vertical: true)
+                .foregroundColor(AppColors.textDark)
+                .padding(.vertical, 4)
             
-            Button(action: {
-                // Use the prompt
-                if title.isEmpty {
-                    title = initialPrompt.prefix(30).appending("...")
-                }
-                if content.isEmpty {
-                    content = initialPrompt + "\n\n"
-                }
-            }) {
-                Text("Use This Prompt")
-                    .font(AppTextStyles.button)
-                    .foregroundColor(AppColors.primary)
+            if initialPrompt.contains("rejection") || selectedTags.contains("Rejection") {
+                Text("💡 Tip: Writing about rejection experiences can help reduce their emotional impact and build resilience.")
+                    .font(AppTextStyles.caption)
+                    .foregroundColor(AppColors.textMedium)
+                    .padding(.top, 4)
             }
-            .makeAccessible(
-                label: "Use this prompt",
-                hint: "Start writing based on this prompt"
-            )
         }
         .padding()
         .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                .stroke(AppColors.accent1.opacity(0.3), lineWidth: 1)
-        )
-        .transition(.opacity)
-        .animation(.easeInOut, value: showingPrompt)
-        .accessibleCard(
-            label: "Journal prompt",
-            hint: initialPrompt
-        )
     }
     
-    // MARK: - Save Entry
-    
+    // Save the journal entry
     private func saveEntry() {
-        // Create new entry from form data
-        let newEntry = JournalEntryModel(
+        let entry = JournalEntryModel(
             id: UUID().uuidString,
             date: Date(),
             title: title,
             content: content,
             tags: selectedTags,
             mood: selectedMood,
-            moodIntensity: selectedMood != nil && selectedMood != .neutral ? Int(moodIntensity) : nil
+            moodIntensity: showingMoodPicker && selectedMood != nil ? Int(moodIntensity) : nil
         )
         
-        onSave(newEntry)
+        onSave(entry)
         dismiss()
     }
 }
@@ -855,6 +954,10 @@ struct JournalEntryDetailView: View {
                 JournalEntryEditorView(
                     isNewEntry: false,
                     initialPrompt: "",
+                    initialTitle: "",
+                    initialTags: [],
+                    initialMood: nil,
+                    initialMoodIntensity: 5,
                     onSave: onUpdate
                 )
             }

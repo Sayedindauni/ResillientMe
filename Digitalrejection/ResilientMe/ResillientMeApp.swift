@@ -1,3 +1,4 @@
+// Import NotificationManager from Services directory
 //
 //  ResillientMeApp.swift
 //  ResillientMe
@@ -6,8 +7,11 @@
 //
 
 import SwiftUI
+import UserNotifications
 import FirebaseCore
+import CoreData
 
+// No need to explicitly import NotificationManager as it's part of the same module
 
 class AppDelegate: NSObject, UIApplicationDelegate {
   func application(_ application: UIApplication,
@@ -17,21 +21,29 @@ class AppDelegate: NSObject, UIApplicationDelegate {
   }
 }
 
-
 @main
 struct ResillientMeApp: App {
     // Set up any global app dependencies here
     @StateObject private var appState = AppState()
+    @StateObject private var notificationManager = NotificationManager()
     
     // register app delegate for Firebase setup
-      @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     
+    // Add environment for Core Data
+    let persistenceController = PersistenceController.shared
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(context: persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(appState)
+                .environmentObject(notificationManager)
                 .preferredColorScheme(.light) // Force light mode for now
+                .onAppear {
+                    // Request notification permissions
+                    notificationManager.requestPermission()
+                }
         }
     }
 }
