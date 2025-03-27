@@ -53,28 +53,36 @@ struct ContentView: View {
     init(context: NSManagedObjectContext) {
         let moodStore = MoodStore(context: context)
         _moodStore = StateObject(wrappedValue: moodStore)
-        _moodAnalysisEngine = StateObject(wrappedValue: MoodAnalysisEngine(moodStore: moodStore))
+        
+        // Create an instance of EngineMoodStore for the MoodAnalysisEngine
+        let engineMoodStore = EngineMoodStore()
+        _moodAnalysisEngine = StateObject(wrappedValue: MoodAnalysisEngine(moodStore: engineMoodStore))
     }
     
     var body: some View {
         ZStack {
             // Main app content
             VStack(spacing: 0) {
-                // Daily affirmation banner (collapsible)
-                AffirmationBanner(affirmation: dailyAffirmation)
-                
                 // Tab view for main navigation
                 TabView(selection: $selectedTab) {
-                    DashboardView()
-                        .tabItem {
-                            Image(systemName: "house.fill")
-                            Text("Home")
-                        }
-                        .tag(0)
-                        .makeAccessible(
-                            label: "Home Dashboard", 
-                            hint: "View your dashboard with resources and activities"
-                        )
+                    VStack(spacing: 0) {
+                        // Daily affirmation banner only shown on Home tab
+                        AffirmationBanner(affirmation: dailyAffirmation)
+                        
+                        DashboardView()
+                    }
+                    .tabItem {
+                        Image(systemName: "house.fill")
+                        Text("Home")
+                    }
+                    .tag(0)
+                    .makeAccessible(
+                        label: "Home Dashboard", 
+                        hint: "View your dashboard with resources and activities"
+                    )
+                    .onReceive(affirmationRefreshObserver) { _ in
+                        refreshAffirmation()
+                    }
                     
                     JournalView(
                         initialPromptData: journalPromptData,

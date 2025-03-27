@@ -91,7 +91,7 @@ struct OnboardingScreenView: View {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
                             }
-                            .font(AppTextStyles.button)
+                            .font(AppTextStyles.buttonFont)
                             .foregroundColor(AppColors.textMedium)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
@@ -119,7 +119,7 @@ struct OnboardingScreenView: View {
                                 Image(systemName: "chevron.right")
                             }
                         }
-                        .font(AppTextStyles.button)
+                        .font(AppTextStyles.buttonFont)
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)

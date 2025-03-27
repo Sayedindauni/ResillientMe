@@ -12,23 +12,23 @@ import Combine
 
 // MARK: - AI Service
 
-class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+public class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     private var webView: WKWebView?
     private var completion: ((Result<String, Error>) -> Void)?
     private var pendingQueries = [String: (Result<String, Error>) -> Void]()
     private let initializationSubject = PassthroughSubject<Bool, Never>()
-    var isInitialized: AnyPublisher<Bool, Never> {
+    public var isInitialized: AnyPublisher<Bool, Never> {
         return initializationSubject.eraseToAnyPublisher()
     }
     
     private var queryCounter = 0
     
-    enum PuterAIError: Error {
+    public enum PuterAIError: Error {
         case notInitialized
         case requestFailed(String)
     }
     
-    override init() {
+    public override init() {
         super.init()
         setupWebView()
     }
@@ -95,12 +95,12 @@ class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     }
     
     // WKNavigationDelegate methods
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         print("WebView loaded")
     }
     
     // WKScriptMessageHandler method
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
         case "puterAIInitialized":
             print("Puter AI initialized")
@@ -132,7 +132,7 @@ class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     }
     
     // Analyze mood patterns and return AI-generated recommendations
-    func analyzeMoodPatterns(moodData: [MoodData], completion: @escaping (Result<String, Error>) -> Void) {
+    public func analyzeMoodPatterns(moodData: [MoodData], completion: @escaping (Result<String, Error>) -> Void) {
         // Create a unique ID for this query
         queryCounter += 1
         let queryId = "query_\(queryCounter)"
@@ -228,7 +228,7 @@ class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     }
     
     // Function to generate coping strategies for a specific mood/trigger
-    func generateCopingStrategies(mood: String, trigger: String?, completion: @escaping (Result<[String], Error>) -> Void) {
+    public func generateCopingStrategies(mood: String, trigger: String?, completion: @escaping (Result<[String], Error>) -> Void) {
         // Create a unique ID for this query
         queryCounter += 1
         let queryId = "query_\(queryCounter)"
@@ -293,7 +293,7 @@ class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     }
     
     // Function to generate a journal prompt based on mood
-    func generateJournalPrompt(mood: String, trigger: String?, completion: @escaping (Result<String, Error>) -> Void) {
+    public func generateJournalPrompt(mood: String, trigger: String?, completion: @escaping (Result<String, Error>) -> Void) {
         // Create a unique ID for this query
         queryCounter += 1
         let queryId = "query_\(queryCounter)"

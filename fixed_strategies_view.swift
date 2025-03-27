@@ -654,7 +654,7 @@ struct CopingStrategiesLibraryView: View {
                 Spacer()
                 
                 Text("\(strategies.count) strategies")
-                    .font(AppTextStyles.captionText)
+                    .font(AppTextStyles.caption)
                     .foregroundColor(Color("TextMedium"))
             }
             
@@ -681,13 +681,13 @@ struct CopingStrategiesLibraryView: View {
                         .foregroundColor(color)
                     
                     Text(strategy.category.rawValue)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(color)
                     
                     Spacer()
                     
                     Text(strategy.timeToComplete)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(Color("TextMedium"))
                 }
                 
@@ -712,7 +712,7 @@ struct CopingStrategiesLibraryView: View {
                     Spacer()
                     
                     Text("View")
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(color)
                 }
             }
@@ -1168,7 +1168,7 @@ struct LocalStrategyDetailView: View {
                         .font(.system(size: 12))
                     
                     Text(strategy.category.rawValue)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -1183,7 +1183,7 @@ struct LocalStrategyDetailView: View {
                         .font(.system(size: 12))
                     
                     Text(strategy.timeToComplete)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -1242,15 +1242,11 @@ struct LocalStrategyDetailView: View {
         }) {
             HStack(alignment: .top, spacing: 16) {
                 // Step number
-                let fillColor: Color = isCompleted ? strategy.category.color : 
-                                     isSelected ? strategy.category.color.opacity(0.7) : 
-                                     Color("CardBackground")
-                                     
-                let textColor: Color = isSelected ? .white : Color("TextDark")
-                
                 ZStack {
                     Circle()
-                        .fill(fillColor)
+                        .fill(isCompleted ? strategy.category.color : 
+                              isSelected ? strategy.category.color.opacity(0.7) : 
+                              Color("CardBackground"))
                         .frame(width: 30, height: 30)
                     
                     if isCompleted {
@@ -1260,7 +1256,7 @@ struct LocalStrategyDetailView: View {
                     } else {
                         Text("\(index + 1)")
                             .font(AppTextStyles.body3.bold())
-                            .foregroundColor(textColor)
+                            .foregroundColor(isSelected ? .white : Color("TextDark"))
                     }
                 }
                 
@@ -1301,7 +1297,7 @@ struct LocalStrategyDetailView: View {
                         }
                     }) {
                         Text("Complete")
-                            .font(AppTextStyles.captionText)
+                            .font(AppTextStyles.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(strategy.category.color)
@@ -1313,35 +1309,18 @@ struct LocalStrategyDetailView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                    .fill(getBgColor(isCompleted: isCompleted, isSelected: isSelected))
+                    .fill(isCompleted ? strategy.category.color.opacity(0.1) :
+                          isSelected ? strategy.category.color.opacity(0.05) : 
+                          Color("CardBackground"))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                    .stroke(getStrokeColor(isSelected: isSelected, isCompleted: isCompleted), lineWidth: 1)
+                    .stroke(isSelected ? strategy.category.color : 
+                            isCompleted ? strategy.category.color.opacity(0.5) : 
+                            Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
-    }
-    
-    // Helper methods for complex expressions
-    private func getBgColor(isCompleted: Bool, isSelected: Bool) -> Color {
-        if isCompleted {
-            return strategy.category.color.opacity(0.1)
-        } else if isSelected {
-            return strategy.category.color.opacity(0.05)
-        } else {
-            return Color("CardBackground")
-        }
-    }
-    
-    private func getStrokeColor(isSelected: Bool, isCompleted: Bool) -> Color {
-        if isSelected {
-            return strategy.category.color
-        } else if isCompleted {
-            return strategy.category.color.opacity(0.5)
-        } else {
-            return Color.clear
-        }
     }
     
     private var timerButtonView: some View {
@@ -1451,7 +1430,7 @@ struct LocalStrategyDetailView: View {
             LocalFlowLayout(spacing: 8) {
                 ForEach(strategy.moodTargets, id: \.self) { mood in
                     Text(mood)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color("Background"))
@@ -1752,7 +1731,7 @@ struct LocalShareToCommunityView: View {
                     .font(.system(size: 12))
                 
                 Text(strategy.category.rawValue)
-                    .font(AppTextStyles.captionText)
+                    .font(AppTextStyles.caption)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -1866,7 +1845,7 @@ struct LocalSuccessAlertView: View {
                         }
                     }) {
                         Text("OK")
-                            .font(AppTextStyles.buttonFont)
+                            .font(AppTextStyles.button)
                             .foregroundColor(.white)
                             .frame(width: 100)
                             .padding(.vertical, 12)

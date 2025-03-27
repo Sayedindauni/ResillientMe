@@ -1,46 +1,54 @@
 import SwiftUI
+import UIKit // Required for UIColor and adaptiveColor
 
 // MARK: - App Colors
-struct AppColors {
+public struct AppColors {
     // Primary application colors
-    static let primary = Color("AppPrimary") // Blue
-    static let secondary = Color(hex: "94B49F") // Sage green
-    static let accent = Color(hex: "D7A9E3") // Lavender
+    public static let primary = Color("AppPrimary") // Blue
+    public static let secondary = Color(hex: "94B49F") // Sage green
+    public static let accent = Color(hex: "D7A9E3") // Lavender
     
     // Additional accent colors for variety
-    static let accent1 = Color(hex: "FFE5B4") // Soft peach
-    static let accent2 = Color(hex: "D7A9E3") // Lavender
-    static let accent3 = Color(hex: "8FC1D4") // Powder blue
+    public static let accent1 = Color(hex: "FFE5B4") // Soft peach
+    public static let accent2 = Color(hex: "D7A9E3") // Lavender
+    public static let accent3 = Color(hex: "8FC1D4") // Powder blue
     
     // Text colors
-    static let textDark = Color(hex: "3A3A3A") // Dark gray
-    static let textLight = Color(hex: "9F9F9F") // Light gray
-    static let textMuted = Color(hex: "C0C0C0") // Muted gray
-    static let textMedium = Color(hex: "696969") // Medium gray
+    public static let textDark = Color(hex: "3A3A3A") // Dark gray
+    public static let textLight = Color(hex: "9F9F9F") // Light gray
+    public static let textMuted = Color(hex: "C0C0C0") // Muted gray
+    public static let textMedium = Color(hex: "696969") // Medium gray
     
     // Background colors
-    static let background = Color(hex: "F8F7F4") // Off-white
-    static let cardBackground = Color(hex: "FFFFFF") // White
+    public static let background = Color(hex: "F8F7F4") // Off-white
+    public static let cardBackground = Color(hex: "FFFFFF") // White
     
     // Mood colors
-    static let joyful = Color(hex: "FFE5B4") // Soft peach
-    static let content = Color(hex: "A7C5EB") // Calm blue
-    static let neutral = Color(hex: "E0E0E0") // Light gray
-    static let sad = Color(hex: "B5C7D3") // Muted blue-gray
-    static let frustrated = Color(hex: "D3B5BD") // Muted mauve
-    static let stressed = Color(hex: "F5B7B1") // Soft red
+    public static let joyful = Color(hex: "FFE5B4") // Soft peach
+    public static let content = Color(hex: "A7C5EB") // Calm blue
+    public static let neutral = Color(hex: "E0E0E0") // Light gray
+    public static let sad = Color(hex: "B5C7D3") // Muted blue-gray
+    public static let frustrated = Color(hex: "D3B5BD") // Muted mauve
+    public static let stressed = Color(hex: "F5B7B1") // Soft red
     
     // Emotional state colors - for backward compatibility
-    static let calm = Color(hex: "A7C5EB") // Calm blue
-    static let joy = Color(hex: "FFDBC5") // Soft orange/peach
-    static let sadness = Color(hex: "B5C7D3") // Muted blue-gray
-    static let frustration = Color(hex: "D3B5BD") // Muted mauve
+    public static let calm = Color(hex: "A7C5EB") // Calm blue
+    public static let joy = Color(hex: "FFDBC5") // Soft orange/peach
+    public static let sadness = Color(hex: "B5C7D3") // Muted blue-gray
+    public static let frustration = Color(hex: "D3B5BD") // Muted mauve
     
     // Semantic colors
-    static let success = Color(hex: "9BDEAC") // Soft green
-    static let warning = Color(hex: "FFE084") // Muted yellow
-    static let error = Color(hex: "F5B7B1") // Soft red
-    static let info = Color(hex: "AED6F1") // Light blue
+    public static let success = Color(hex: "9BDEAC") // Soft green
+    public static let warning = Color(hex: "FFE084") // Muted yellow
+    public static let error = Color(hex: "F5B7B1") // Soft red
+    public static let info = Color(hex: "AED6F1") // Light blue
+    
+    // Other utility colors
+    
+    // Helper method to create a color from hex code (public interface)
+    static func fromHex(_ hex: String) -> Color {
+        return Color(hex: hex)
+    }
     
     // For accessibility and dark mode
     static func adaptiveColor(light: Color, dark: Color) -> Color {
@@ -52,7 +60,7 @@ struct AppColors {
 
 // Extension to create colors from hex values
 extension Color {
-    init(hex: String) {
+    fileprivate init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
@@ -164,4 +172,8 @@ struct OutlineButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
-} 
+}
+
+// Add any additional styles below this line
+
+// End of Theme.swift 

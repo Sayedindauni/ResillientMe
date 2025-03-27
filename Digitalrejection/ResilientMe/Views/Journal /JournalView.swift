@@ -246,7 +246,7 @@ struct JournalView: View {
                 
                 Button(action: { searchText = "" }) {
                     Text("Clear Search")
-                        .font(AppTextStyles.button)
+                        .font(AppTextStyles.buttonFont)
                         .foregroundColor(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
@@ -266,7 +266,7 @@ struct JournalView: View {
                         Image(systemName: "plus")
                         Text("New Entry")
                     }
-                    .font(AppTextStyles.button)
+                    .font(AppTextStyles.buttonFont)
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
@@ -375,7 +375,7 @@ struct JournalEntryRow: View {
             // Date and tags
             HStack {
                 Text(formatDate(entry.date, format: "MMM d, yyyy"))
-                    .font(AppTextStyles.caption)
+                    .font(AppTextStyles.captionText)
                     .foregroundColor(AppColors.textMedium)
                 
                 Spacer()
@@ -387,7 +387,7 @@ struct JournalEntryRow: View {
                     
                     if entry.tags.count > 2 {
                         Text("+\(entry.tags.count - 2)")
-                            .font(AppTextStyles.caption)
+                            .font(AppTextStyles.captionText)
                             .foregroundColor(AppColors.textMedium)
                     }
                 }
@@ -412,11 +412,11 @@ struct JournalEntryRow: View {
                     Image(systemName: "face.smiling")
                         .font(.system(size: 12))
                     Text("Feeling: \(entry.mood?.name ?? "Unknown")")
-                        .font(AppTextStyles.caption)
+                        .font(AppTextStyles.captionText)
                     
                     if let intensity = entry.moodIntensity {
                         Text("(\(intensity)/10)")
-                            .font(AppTextStyles.caption)
+                            .font(AppTextStyles.captionText)
                     }
                 }
                 .foregroundColor(AppColors.textMedium)
@@ -452,7 +452,7 @@ struct TagView: View {
     
     var body: some View {
         Text(tag)
-            .font(AppTextStyles.caption)
+            .font(AppTextStyles.captionText)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(tagColor.opacity(0.2))
@@ -480,6 +480,7 @@ struct JournalEntryEditorView: View {
     @State private var showingPrompt = true
     @State private var showingTagPicker = false
     @State private var showingMoodPicker = false
+    @State private var recommendedStrategiesState: RecommendedStrategiesState?
     @Environment(\.dismiss) private var dismiss
     
     private let availableTags = ["Rejection", "Insight", "Gratitude", "Habit", "Growth"]
@@ -581,7 +582,7 @@ struct JournalEntryEditorView: View {
                                 
                                 Button(action: { showingTagPicker.toggle() }) {
                                     Text(showingTagPicker ? "Done" : "Edit")
-                                        .font(AppTextStyles.button)
+                                        .font(AppTextStyles.buttonFont)
                                         .foregroundColor(AppColors.primary)
                                 }
                                 .makeAccessible(
@@ -664,7 +665,7 @@ struct JournalEntryEditorView: View {
                                                         .font(.system(size: 30))
                                                     
                                                     Text(mood.name)
-                                                        .font(AppTextStyles.caption)
+                                                        .font(AppTextStyles.captionText)
                                                         .foregroundColor(AppColors.textDark)
                                                 }
                                                 .frame(maxWidth: .infinity)
@@ -758,10 +759,14 @@ struct JournalEntryEditorView: View {
                     Button("Save") {
                         saveEntry()
                     }
-                    .font(AppTextStyles.button)
+                    .font(AppTextStyles.buttonFont)
                     .foregroundColor(isSaveButtonEnabled ? AppColors.primary : AppColors.textLight)
                     .disabled(!isSaveButtonEnabled)
                 }
+            }
+            // Add sheet presentation for coping strategies
+            .sheet(item: $recommendedStrategiesState) { state in
+                JournalCopingStrategiesView(recommendationsState: state)
             }
         }
     }
@@ -796,7 +801,7 @@ struct JournalEntryEditorView: View {
             
             if initialPrompt.contains("rejection") || selectedTags.contains("Rejection") {
                 Text("💡 Tip: Writing about rejection experiences can help reduce their emotional impact and build resilience.")
-                    .font(AppTextStyles.caption)
+                    .font(AppTextStyles.captionText)
                     .foregroundColor(AppColors.textMedium)
                     .padding(.top, 4)
             }
@@ -818,8 +823,19 @@ struct JournalEntryEditorView: View {
             moodIntensity: showingMoodPicker && selectedMood != nil ? Int(moodIntensity) : nil
         )
         
+        // First save the entry
         onSave(entry)
-        dismiss()
+        
+        // Then analyze the journal content for strategies
+        let recommendedStrategies = analyzeJournalContentForStrategies(content)
+        
+        // If we have recommendations, present them
+        if !recommendedStrategies.isEmpty {
+            recommendedStrategiesState = RecommendedStrategiesState(strategies: recommendedStrategies)
+        } else {
+            // If no recommendations, dismiss the view
+            dismiss()
+        }
     }
 }
 
@@ -879,7 +895,7 @@ struct JournalEntryDetailView: View {
                     // Header info
                     HStack {
                         Text(formatDate(entry.date, format: "EEEE, MMMM d, yyyy"))
-                            .font(AppTextStyles.body2)
+                            .font(AppTextStyles.captionText)
                             .foregroundColor(AppColors.textMedium)
                         
                         Spacer()
@@ -890,12 +906,12 @@ struct JournalEntryDetailView: View {
                                     .font(.system(size: 16))
                                 
                                 Text("Feeling \(mood.name)")
-                                    .font(AppTextStyles.caption)
+                                    .font(AppTextStyles.captionText)
                                     .foregroundColor(AppColors.textMedium)
                                 
                                 if let intensity = entry.moodIntensity, mood != .neutral {
                                     Text("(\(intensity)/10)")
-                                        .font(AppTextStyles.caption)
+                                        .font(AppTextStyles.captionText)
                                         .foregroundColor(AppColors.textMedium)
                                 }
                             }
@@ -1029,6 +1045,10 @@ struct JournalEntryDetailView: View {
         case .sad: return AppColors.sadness
         case .frustrated: return AppColors.frustration
         case .stressed: return AppColors.error
+        case .rejected: return AppColors.sadness
+        case .angry: return AppColors.frustration
+        case .happy: return AppColors.joy
+        default: return AppColors.textMedium // Add a default case to handle any future additions to the Mood enum
         }
     }
 }
@@ -1100,5 +1120,315 @@ struct SampleData {
 struct JournalView_Previews: PreviewProvider {
     static var previews: some View {
         JournalView()
+    }
+}
+
+// MARK: - Journal Analysis for Coping Strategies
+
+/// Analyzes journal content to extract emotional keywords and recommend coping strategies
+func analyzeJournalContentForStrategies(_ text: String) -> [CopingStrategyDetail] {
+    // Define emotional keywords and their associated categories
+    let emotionalKeywords: [String: CopingStrategyCategory] = [
+        // Anxiety-related
+        "anxious": .mindfulness,
+        "worried": .mindfulness,
+        "nervous": .mindfulness,
+        "stressed": .mindfulness,
+        "overwhelmed": .selfCare,
+        "panic": .mindfulness,
+        "fear": .cognitive,
+        
+        // Depression-related
+        "sad": .selfCare,
+        "depressed": .selfCare,
+        "hopeless": .cognitive,
+        "lonely": .social,
+        "isolated": .social,
+        "alone": .social,
+        "empty": .creative,
+        
+        // Anger-related
+        "angry": .physical,
+        "frustrated": .physical,
+        "irritated": .physical,
+        "annoyed": .cognitive,
+        "resentful": .cognitive,
+        
+        // Positive emotions (for maintenance)
+        "happy": .creative,
+        "joyful": .creative,
+        "grateful": .mindfulness,
+        "content": .mindfulness,
+        "peaceful": .mindfulness,
+        
+        // Relationship-related
+        "rejected": .social,
+        "betrayed": .social,
+        "dismissed": .social,
+        "misunderstood": .cognitive
+    ]
+    
+    // Normalize the text
+    let normalizedText = text.lowercased()
+    
+    // Find matching keywords
+    var matchedCategories = Set<CopingStrategyCategory>()
+    
+    for (keyword, category) in emotionalKeywords {
+        if normalizedText.contains(keyword) {
+            matchedCategories.insert(category)
+        }
+    }
+    
+    // If we didn't find any specific matches, default to some general recommendations
+    if matchedCategories.isEmpty {
+        matchedCategories = [.selfCare, .mindfulness]
+    }
+    
+    // Get recommended strategies
+    let copingStrategiesLibrary = LocalCopingStrategiesLibrary.shared
+    let allStrategies = copingStrategiesLibrary.strategies
+    
+    // Filter strategies based on matched categories
+    let recommendedStrategies = allStrategies.filter { strategy in
+        // Convert local category to global category for comparison
+        let globalCategory = copingStrategiesLibrary.mapToGlobalCategory(strategy.category)
+        return matchedCategories.contains(globalCategory)
+    }
+    
+    // Return up to 5 strategies (shuffled for variety)
+    let localStrategies = Array(recommendedStrategies.shuffled().prefix(5))
+    
+    // Convert local strategies to global strategies
+    return localStrategies.map { $0.toGlobal() }
+}
+
+// MARK: - Recommended Strategies View
+
+// Environment object to track presentation state of recommendations
+class RecommendedStrategiesState: ObservableObject, Identifiable {
+    var id: UUID = UUID()
+    @Published var isPresented: Bool = false
+    let strategies: [CopingStrategyDetail]
+    
+    init(strategies: [CopingStrategyDetail]) {
+        self.strategies = strategies
+    }
+}
+
+struct JournalCopingStrategiesView: View {
+    @ObservedObject var recommendationsState: RecommendedStrategiesState
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                Text("Based on your journal entry, we recommend these coping strategies:")
+                    .font(AppTextStyles.h3)
+                    .foregroundColor(AppColors.textDark)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                // Strategy list
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(recommendationsState.strategies) { strategy in
+                            strategyCard(for: strategy)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // Footer with additional guidance
+                Text("Tap any strategy to view details and get started")
+                    .font(AppTextStyles.body2)
+                    .foregroundColor(AppColors.textMedium)
+                    .padding(.bottom)
+            }
+            .padding(.top)
+            .background(AppColors.background.edgesIgnoringSafeArea(.all))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    Text("Recommended For You")
+                        .font(AppTextStyles.h3)
+                        .foregroundColor(AppColors.textDark)
+                }
+            }
+        }
+    }
+    
+    // Strategy card view
+    private func strategyCard(for strategy: CopingStrategyDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with title and category
+            HStack {
+                Text(strategy.title)
+                    .font(AppTextStyles.h3)
+                    .foregroundColor(AppColors.textDark)
+                Spacer()
+                Text(strategy.category.rawValue)
+                    .font(AppTextStyles.captionText)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(strategy.category.color)
+                    .cornerRadius(12)
+            }
+            
+            // Description
+            Text(strategy.description)
+                .font(AppTextStyles.body2)
+                .foregroundColor(AppColors.textMedium)
+                .multilineTextAlignment(.leading)
+            
+            // Time and intensity
+            HStack {
+                Label(strategy.timeToComplete, systemImage: "clock")
+                    .font(AppTextStyles.captionText)
+                    .foregroundColor(AppColors.textMedium)
+                
+                Spacer()
+                
+                Text(strategy.intensity.rawValue)
+                    .font(AppTextStyles.captionText)
+                    .foregroundColor(strategy.intensity.color)
+            }
+            
+            // Get started button
+            NavigationLink(destination: strategyDetailView(for: strategy)) {
+                Text("Get Started")
+                    .font(AppTextStyles.body2.bold())
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(AppColors.primary)
+                    .cornerRadius(AppLayout.cornerRadius)
+            }
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .cornerRadius(AppLayout.cornerRadius)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    // Create a strategy detail view
+    private func strategyDetailView(for strategy: CopingStrategyDetail) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Category badge
+                Text(strategy.category.rawValue)
+                    .font(AppTextStyles.captionText)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(strategy.category.color)
+                    .cornerRadius(12)
+                
+                // Title
+                Text(strategy.title)
+                    .font(AppTextStyles.h2)
+                    .foregroundColor(AppColors.textDark)
+                
+                // Description
+                Text(strategy.description)
+                    .font(AppTextStyles.body1)
+                    .foregroundColor(AppColors.textMedium)
+                    .padding(.bottom, 10)
+                
+                // Time and intensity
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading) {
+                        Text("TIME")
+                            .font(AppTextStyles.captionText)
+                            .foregroundColor(AppColors.textMedium)
+                        Label(strategy.timeToComplete, systemImage: "clock")
+                            .font(AppTextStyles.body2)
+                            .foregroundColor(AppColors.textDark)
+                    }
+                    
+                    VStack(alignment: .leading) {
+                        Text("INTENSITY")
+                            .font(AppTextStyles.captionText)
+                            .foregroundColor(AppColors.textMedium)
+                        Text(strategy.intensity.rawValue)
+                            .font(AppTextStyles.body2)
+                            .foregroundColor(strategy.intensity.color)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 10)
+                
+                // Steps section
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Steps to Follow")
+                        .font(AppTextStyles.h3)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(Array(strategy.steps.enumerated()), id: \.offset) { index, step in
+                            HStack(alignment: .top, spacing: 16) {
+                                Text("\(index + 1)")
+                                    .font(AppTextStyles.h3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 30, height: 30)
+                                    .background(AppColors.primary)
+                                    .cornerRadius(15)
+                                
+                                Text(step)
+                                    .font(AppTextStyles.body1)
+                                    .foregroundColor(AppColors.textDark)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 10)
+            
+            // Tips section if available
+            if let tips = strategy.tips, !tips.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Helpful Tips")
+                        .font(AppTextStyles.h3)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    ForEach(tips, id: \.self) { tip in
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundColor(AppColors.accent2)
+                            
+                            Text(tip)
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(AppColors.textMedium)
+                        }
+                    }
+                }
+                .padding(.vertical, 10)
+            }
+            
+            // Start now button
+            Button(action: {
+                // Add tracking logic for strategy use
+                dismiss()
+            }) {
+                Text("I've Completed This")
+                    .font(AppTextStyles.body1.bold())
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(AppColors.primary)
+                    .cornerRadius(AppLayout.cornerRadius)
+            }
+            .padding(.top, 20)
+        }
+        .padding()
     }
 } 

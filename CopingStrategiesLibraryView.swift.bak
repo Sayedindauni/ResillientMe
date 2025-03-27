@@ -1,58 +1,147 @@
 import SwiftUI
 import Foundation
-#if canImport(UIKit)
 import UIKit
-#endif
-// Remove problematic imports that can't be resolved
-// import MoodStore
-
-// Temporary solution: Include minimal required Theme components directly
-// This is a workaround until the module import is fixed
-// private struct InlineAppTextStyles {
-//    static let h1 = Font.system(size: 30, weight: .bold)
-//    static let h2 = Font.system(size: 24, weight: .bold)
-//    static let h3 = Font.system(size: 20, weight: .semibold)
-//    static let h4 = Font.system(size: 18, weight: .semibold)
-//    static let body1 = Font.system(size: 16, weight: .regular)
-//    static let body2 = Font.system(size: 14, weight: .regular)
-//    static let body3 = Font.system(size: 12, weight: .regular)
-//    static let caption = Font.system(size: 12, weight: .regular)
-//    static let button = Font.system(size: 16, weight: .medium)
-//}
-// private struct InlineAppLayout {
-//    static let cornerRadius: CGFloat = 12.0
-//    static let spacing: CGFloat = 16.0
-//}
-// private struct InlinePredefinedMoods {
-//    static let positive = ["Happy", "Calm", "Excited", "Grateful", "Proud", "Motivated", "Confident"]
-//    static let negative = ["Sad", "Anxious", "Angry", "Discouraged", "Frustrated", "Disappointed", "Embarrassed", "Overwhelmed"]
-//    static let neutral = ["Neutral", "Tired", "Confused", "Surprised", "Curious"]
-//    
-//    static var all: [String] {
-//        positive + negative + neutral
-//    }
-//    
-//    static func categoryFor(mood: String) -> String {
-//        if positive.contains(mood) { return "Positive" }
-//        if negative.contains(mood) { return "Negative" }
-//        return "Neutral"
-//    }
-//}
-
-// Fix type alias scope issues
-// Error: Type alias must be declared private or fileprivate
-// private typealias AppTextStyles = InlineAppTextStyles
-// private typealias AppLayout = InlineAppLayout
-// Add alias for the renamed PredefinedMoods
-// private typealias PredefinedMoods = InlinePredefinedMoods
+import Digitalrejection.Theme
 
 // Local declarations of types
 // Fallback declarations
+public enum CopingStrategyCategory: String, CaseIterable, Identifiable {
+    case mindfulness = "Mindfulness"
+    case cognitive = "Cognitive"
+    case physical = "Physical"
+    case social = "Social"
+    case creative = "Creative"
+    case selfCare = "Self-Care"
+    
+    public var id: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .mindfulness: return "brain.head.profile"
+        case .cognitive: return "lightbulb"
+        case .physical: return "figure.walk"
+        case .social: return "person.2"
+        case .creative: return "paintpalette"
+        case .selfCare: return "heart.fill"
+        }
+    }
+    
+    public var color: Color {
+        switch self {
+        case .mindfulness: return Color.blue
+        case .cognitive: return Color.purple
+        case .physical: return Color(red: 0.2, green: 0.8, blue: 0.4)
+        case .social: return Color(red: 0.6, green: 0.4, blue: 0.8)
+        case .creative: return Color(red: 0.9, green: 0.3, blue: 0.5)
+        case .selfCare: return Color(red: 0.9, green: 0.4, blue: 0.4)
+        }
+    }
+}
 
-// Rename to avoid redeclaration of 'StrategyEffectivenessStore'
-// Error: Invalid redeclaration of 'StrategyEffectivenessStore'
-class LocalStrategyEffectivenessStore: ObservableObject {
-    static let shared = LocalStrategyEffectivenessStore()
+public struct CopingStrategyDetail: Identifiable {
+    public let id: String
+    public let title: String
+    public let description: String
+    public let category: CopingStrategyCategory
+    public let timeToComplete: String
+    public let steps: [String]
+    public let intensity: StrategyIntensity
+    public let moodTargets: [String]
+    
+    // Optional additional fields
+    public var tips: [String]?
+    public var resources: [String]?
+    
+    // Enum for strategy intensity
+    public enum StrategyIntensity: String, Codable {
+        case quick = "Quick"
+        case moderate = "Moderate"
+        case intensive = "Intensive"
+        
+        public var color: Color {
+            switch self {
+            case .quick: return Color.green
+            case .moderate: return Color.blue
+            case .intensive: return Color.purple
+            }
+        }
+    }
+    
+    public init(id: String, title: String, description: String, category: CopingStrategyCategory, timeToComplete: String, steps: [String], intensity: StrategyIntensity, moodTargets: [String], tips: [String]? = nil, resources: [String]? = nil) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.category = category
+        self.timeToComplete = timeToComplete
+        self.steps = steps
+        self.intensity = intensity
+        self.moodTargets = moodTargets
+        self.tips = tips
+        self.resources = resources
+    }
+}
+
+public class GlobalCopingStrategiesLibrary {
+    // Singleton instance
+    public static let shared = GlobalCopingStrategiesLibrary()
+    
+    // All available strategies
+    public var strategies: [CopingStrategyDetail] = []
+    
+    // Private initializer for singleton
+    private init() {
+        loadStrategies()
+    }
+    
+    // Get strategies for a specific category
+    public func getStrategies(for category: CopingStrategyCategory) -> [CopingStrategyDetail] {
+        return strategies.filter { $0.category == category }
+    }
+    
+    // Recommend strategies based on mood and trigger
+    public func recommendStrategies(for mood: String, intensity: Int, trigger: String? = nil) -> [CopingStrategyDetail] {
+        // Simplified implementation
+        return Array(strategies.prefix(3))
+    }
+    
+    // Load strategies from data
+    private func loadStrategies() {
+        // Example strategy
+        let strategy1 = CopingStrategyDetail(
+            id: "1",
+            title: "Deep Breathing",
+            description: "Simple deep breathing exercise to calm anxiety",
+            category: .mindfulness,
+            timeToComplete: "2 minutes",
+            steps: ["Breathe in for 4 counts", "Hold for 4 counts", "Exhale for 4 counts", "Repeat 5 times"],
+            intensity: .quick,
+            moodTargets: ["Anxiety", "Stress"]
+        )
+        
+        let strategy2 = CopingStrategyDetail(
+            id: "2",
+            title: "Grounding 5-4-3-2-1",
+            description: "Focus on your senses to ground yourself in the present moment",
+            category: .mindfulness,
+            timeToComplete: "5 minutes",
+            steps: [
+                "Notice 5 things you can see",
+                "Notice 4 things you can touch",
+                "Notice 3 things you can hear",
+                "Notice 2 things you can smell",
+                "Notice 1 thing you can taste"
+            ],
+            intensity: .moderate,
+            moodTargets: ["Anxiety", "Panic", "Stress"]
+        )
+        
+        strategies = [strategy1, strategy2]
+    }
+}
+
+// Implementation of StrategyEffectivenessStore
+class StrategyEffectivenessStore: ObservableObject {
+    static let shared = StrategyEffectivenessStore()
     
     @Published var ratingData: [StrategyRating] = []
     
@@ -153,12 +242,12 @@ class LocalStrategyEffectivenessStore: ObservableObject {
 
 // Import all necessary model types from external sources without duplicate definitions
 // This is a simplified mock that will be replaced by the actual implementation
-class LocalCopingStrategiesLibrary {
-    static let shared = LocalCopingStrategiesLibrary()
+class CopingStrategiesLibrary {
+    static let shared = CopingStrategiesLibrary()
     var strategies: [LocalCopingStrategyDetail] = []
     
     // Convert global CopingStrategyDetail to local
-    func convertToLocal(_ global: AppCopingStrategyDetail) -> LocalCopingStrategyDetail {
+    func convertToLocal(_ global: CopingStrategyDetail) -> LocalCopingStrategyDetail {
         return LocalCopingStrategyDetail(
             id: global.id,
             title: global.title,
@@ -174,7 +263,7 @@ class LocalCopingStrategiesLibrary {
     }
     
     // Convert global category to local
-    func mapCategory(_ category: AppCopingStrategyCategory) -> LocalCopingStrategyCategory {
+    func mapCategory(_ category: CopingStrategyCategory) -> LocalCopingStrategyCategory {
         switch category {
         case .mindfulness: return .mindfulness
         case .physical: return .physical
@@ -186,7 +275,7 @@ class LocalCopingStrategiesLibrary {
     }
     
     // Convert global intensity to local
-    func mapIntensity(_ intensity: AppCopingStrategyDetail.StrategyIntensity) -> LocalCopingStrategyDetail.StrategyIntensity {
+    func mapIntensity(_ intensity: CopingStrategyDetail.StrategyIntensity) -> LocalCopingStrategyDetail.StrategyIntensity {
         switch intensity {
         case .quick: return .quick
         case .moderate: return .moderate
@@ -203,7 +292,7 @@ class LocalCopingStrategiesLibrary {
     }
     
     // Map from local to global category
-    func mapToGlobalCategory(_ category: LocalCopingStrategyCategory) -> AppCopingStrategyCategory {
+    func mapToGlobalCategory(_ category: LocalCopingStrategyCategory) -> CopingStrategyCategory {
         switch category {
         case .mindfulness: return .mindfulness
         case .physical: return .physical
@@ -216,7 +305,7 @@ class LocalCopingStrategiesLibrary {
     
     // Load strategies from global library
     func loadFromGlobal() {
-        let globalStrategies = AppCopingStrategiesLibrary.shared.strategies
+        let globalStrategies = GlobalCopingStrategiesLibrary.shared.strategies
         strategies = globalStrategies.map { convertToLocal($0) }
     }
     
@@ -224,9 +313,24 @@ class LocalCopingStrategiesLibrary {
     
     // Recommend strategies based on mood and trigger
     func recommendStrategies(for mood: String, intensity: Int, trigger: String? = nil) -> [LocalCopingStrategyDetail] {
-        // Use global library to get recommendations, then convert to local format
-        let globalStrategies = AppCopingStrategiesLibrary.shared.recommendStrategies(for: mood, intensity: intensity, trigger: trigger)
-        return globalStrategies.map { convertToLocal($0) }
+        // Forward to global library and convert to local
+        let globalStrategies = GlobalCopingStrategiesLibrary.shared.recommendStrategies(for: mood, intensity: intensity, trigger: trigger)
+        
+        // Convert global strategies to local ones
+        return globalStrategies.map { globalStrategy in
+            LocalCopingStrategyDetail(
+                id: globalStrategy.id,
+                title: globalStrategy.title,
+                description: globalStrategy.description,
+                category: mapCategory(globalStrategy.category),
+                timeToComplete: globalStrategy.timeToComplete,
+                steps: globalStrategy.steps,
+                intensity: mapIntensity(globalStrategy.intensity),
+                moodTargets: globalStrategy.moodTargets,
+                tips: globalStrategy.tips,
+                resources: globalStrategy.resources
+            )
+        }
     }
     
     // Convert detailed strategies to simple strings (for backward compatibility)
@@ -313,21 +417,21 @@ enum LocalCopingStrategyCategory: String, CaseIterable, Identifiable {
 // MARK: - Coping Strategy Detail
 
 struct LocalCopingStrategyDetail: Identifiable {
-    public let id: String
-    public let title: String
-    public let description: String
-    public let category: LocalCopingStrategyCategory
-    public let timeToComplete: String
-    public let steps: [String]
-    public let intensity: StrategyIntensity
-    public let moodTargets: [String]
+    let id: String
+    let title: String
+    let description: String
+    let category: LocalCopingStrategyCategory
+    let timeToComplete: String
+    let steps: [String]
+    let intensity: StrategyIntensity
+    let moodTargets: [String]
     
     // Optional additional fields
-    public var tips: [String]?
-    public var resources: [String]?
+    var tips: [String]?
+    var resources: [String]?
     
     // Enum for strategy intensity
-    public enum StrategyIntensity: String, Codable {
+    enum StrategyIntensity: String, Codable {
         case quick = "Quick"
         case moderate = "Moderate"
         case intensive = "Intensive"
@@ -340,44 +444,11 @@ struct LocalCopingStrategyDetail: Identifiable {
             }
         }
     }
-    
-    // Add conversion method to transform local to global type
-    public func toGlobal() -> AppCopingStrategyDetail {
-        let globalCategory: AppCopingStrategyCategory
-        switch category {
-        case .mindfulness: globalCategory = .mindfulness
-        case .cognitive: globalCategory = .cognitive
-        case .physical: globalCategory = .physical
-        case .social: globalCategory = .social
-        case .creative: globalCategory = .creative
-        case .selfCare: globalCategory = .selfCare
-        }
-        
-        let globalIntensity: AppCopingStrategyDetail.StrategyIntensity
-        switch intensity {
-        case .quick: globalIntensity = .quick
-        case .moderate: globalIntensity = .moderate
-        case .intensive: globalIntensity = .intensive
-        }
-        
-        return AppCopingStrategyDetail(
-            id: id,
-            title: title,
-            description: description,
-            category: globalCategory,
-            timeToComplete: timeToComplete,
-            steps: steps,
-            intensity: globalIntensity,
-            moodTargets: moodTargets,
-            tips: tips,
-            resources: resources
-        )
-    }
 }
 
 struct CopingStrategiesLibraryView: View {
-    // Access the library - update reference to use renamed library
-    private let copingStrategiesLibrary = LocalCopingStrategiesLibrary.shared
+    // Access the library
+    private let copingStrategiesLibrary = CopingStrategiesLibrary.shared
     
     // State variables
     @State private var selectedCategory: LocalCopingStrategyCategory?
@@ -385,7 +456,7 @@ struct CopingStrategiesLibraryView: View {
     @State private var showingStrategyDetail = false
     @State private var searchText = ""
     @State private var isShowingSuccessAlert = false
-    @ObservedObject private var strategyStore = LocalStrategyEffectivenessStore.shared
+    @ObservedObject private var strategyStore = StrategyEffectivenessStore.shared
     @State private var showingRatingSheet = false
     @State private var selectedMoodBefore: String? = nil
     @State private var selectedMoodAfter: String? = nil
@@ -498,7 +569,7 @@ struct CopingStrategiesLibraryView: View {
             }
             .sheet(isPresented: $showingStrategyDetail) {
                 if let strategy = selectedStrategy {
-                    LocalStrategyDetailView(strategy: strategy)
+                    StrategyDetailView(strategy: strategy)
                 }
             }
         }
@@ -654,7 +725,7 @@ struct CopingStrategiesLibraryView: View {
                 Spacer()
                 
                 Text("\(strategies.count) strategies")
-                    .font(AppTextStyles.captionText)
+                    .font(AppTextStyles.caption)
                     .foregroundColor(Color("TextMedium"))
             }
             
@@ -681,13 +752,13 @@ struct CopingStrategiesLibraryView: View {
                         .foregroundColor(color)
                     
                     Text(strategy.category.rawValue)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(color)
                     
                     Spacer()
                     
                     Text(strategy.timeToComplete)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(Color("TextMedium"))
                 }
                 
@@ -712,7 +783,7 @@ struct CopingStrategiesLibraryView: View {
                     Spacer()
                     
                     Text("View")
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .foregroundColor(color)
                 }
             }
@@ -1000,7 +1071,7 @@ struct CopingStrategiesLibraryView: View {
 
 // MARK: - Strategy Detail View
 
-struct LocalStrategyDetailView: View {
+struct StrategyDetailView: View {
     let strategy: LocalCopingStrategyDetail
     @Environment(\.presentationMode) var presentationMode
     @State private var selectedStep: Int = 0
@@ -1019,7 +1090,7 @@ struct LocalStrategyDetailView: View {
     @State private var ratingValue: Int = 0
     @State private var moodImpactNote: String = ""
     @State private var showCompletionBanner = false
-    @ObservedObject private var strategyStore = LocalStrategyEffectivenessStore.shared
+    @ObservedObject private var strategyStore = StrategyEffectivenessStore.shared
     @State private var completedSteps = Set<Int>()
     
     // MARK: - Helper Properties
@@ -1115,7 +1186,7 @@ struct LocalStrategyDetailView: View {
             
             // Success alert
             if isShowingSuccessAlert {
-                LocalSuccessAlertView(
+                SuccessAlertView(
                     title: "Success!",
                     message: "You've completed this strategy.\nHow did it make you feel?",
                     isPresented: $isShowingSuccessAlert
@@ -1134,7 +1205,7 @@ struct LocalStrategyDetailView: View {
             strategyRatingView(strategy: strategy)
         }
         .sheet(isPresented: $showingCommunityShare) {
-            LocalShareToCommunityView(strategy: strategy)
+            ShareToCommunityView(strategy: strategy)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -1168,7 +1239,7 @@ struct LocalStrategyDetailView: View {
                         .font(.system(size: 12))
                     
                     Text(strategy.category.rawValue)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -1183,7 +1254,7 @@ struct LocalStrategyDetailView: View {
                         .font(.system(size: 12))
                     
                     Text(strategy.timeToComplete)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -1242,15 +1313,11 @@ struct LocalStrategyDetailView: View {
         }) {
             HStack(alignment: .top, spacing: 16) {
                 // Step number
-                let fillColor: Color = isCompleted ? strategy.category.color : 
-                                     isSelected ? strategy.category.color.opacity(0.7) : 
-                                     Color("CardBackground")
-                                     
-                let textColor: Color = isSelected ? .white : Color("TextDark")
-                
                 ZStack {
                     Circle()
-                        .fill(fillColor)
+                        .fill(isCompleted ? strategy.category.color : 
+                              isSelected ? strategy.category.color.opacity(0.7) : 
+                              Color("CardBackground"))
                         .frame(width: 30, height: 30)
                     
                     if isCompleted {
@@ -1260,7 +1327,7 @@ struct LocalStrategyDetailView: View {
                     } else {
                         Text("\(index + 1)")
                             .font(AppTextStyles.body3.bold())
-                            .foregroundColor(textColor)
+                            .foregroundColor(isSelected ? .white : Color("TextDark"))
                     }
                 }
                 
@@ -1301,7 +1368,7 @@ struct LocalStrategyDetailView: View {
                         }
                     }) {
                         Text("Complete")
-                            .font(AppTextStyles.captionText)
+                            .font(AppTextStyles.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(strategy.category.color)
@@ -1313,35 +1380,18 @@ struct LocalStrategyDetailView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                    .fill(getBgColor(isCompleted: isCompleted, isSelected: isSelected))
+                    .fill(isCompleted ? strategy.category.color.opacity(0.1) :
+                          isSelected ? strategy.category.color.opacity(0.05) : 
+                          Color("CardBackground"))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                    .stroke(getStrokeColor(isSelected: isSelected, isCompleted: isCompleted), lineWidth: 1)
+                    .stroke(isSelected ? strategy.category.color : 
+                            isCompleted ? strategy.category.color.opacity(0.5) : 
+                            Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
-    }
-    
-    // Helper methods for complex expressions
-    private func getBgColor(isCompleted: Bool, isSelected: Bool) -> Color {
-        if isCompleted {
-            return strategy.category.color.opacity(0.1)
-        } else if isSelected {
-            return strategy.category.color.opacity(0.05)
-        } else {
-            return Color("CardBackground")
-        }
-    }
-    
-    private func getStrokeColor(isSelected: Bool, isCompleted: Bool) -> Color {
-        if isSelected {
-            return strategy.category.color
-        } else if isCompleted {
-            return strategy.category.color.opacity(0.5)
-        } else {
-            return Color.clear
-        }
     }
     
     private var timerButtonView: some View {
@@ -1448,10 +1498,10 @@ struct LocalStrategyDetailView: View {
                 .foregroundColor(Color("TextDark"))
             
             // Mood tags
-            LocalFlowLayout(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 ForEach(strategy.moodTargets, id: \.self) { mood in
                     Text(mood)
-                        .font(AppTextStyles.captionText)
+                        .font(AppTextStyles.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color("Background"))
@@ -1685,7 +1735,7 @@ struct LocalStrategyDetailView: View {
 // MARK: - Helper Views
 
 /// View for sharing a strategy to the community
-struct LocalShareToCommunityView: View {
+struct ShareToCommunityView: View {
     let strategy: LocalCopingStrategyDetail
     @Environment(\.presentationMode) var presentationMode
     @State private var personalNote: String = ""
@@ -1752,7 +1802,7 @@ struct LocalShareToCommunityView: View {
                     .font(.system(size: 12))
                 
                 Text(strategy.category.rawValue)
-                    .font(AppTextStyles.captionText)
+                    .font(AppTextStyles.caption)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -1836,7 +1886,7 @@ struct LocalShareToCommunityView: View {
 }
 
 /// Success alert view for strategy completion
-struct LocalSuccessAlertView: View {
+struct SuccessAlertView: View {
     let title: String
     let message: String
     @Binding var isPresented: Bool
@@ -1866,7 +1916,7 @@ struct LocalSuccessAlertView: View {
                         }
                     }) {
                         Text("OK")
-                            .font(AppTextStyles.buttonFont)
+                            .font(AppTextStyles.button)
                             .foregroundColor(.white)
                             .frame(width: 100)
                             .padding(.vertical, 12)
@@ -1898,7 +1948,7 @@ struct LocalSuccessAlertView: View {
 }
 
 /// Flow layout that arranges items in rows
-struct LocalFlowLayout: Layout {
+struct FlowLayout: Layout {
     var spacing: CGFloat
     
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
@@ -1975,7 +2025,7 @@ struct CopingStrategiesLibraryView_Previews: PreviewProvider {
 }
 
 // Add ActivityViewController for the standard iOS share sheet
-struct LocalActivityViewController: UIViewControllerRepresentable {
+struct ActivityViewController: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
     
@@ -1990,12 +2040,9 @@ struct LocalActivityViewController: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// Create private type alias for backward compatibility
-private typealias ActivityViewController = LocalActivityViewController
-
 // MARK: - StrategyDetailView Extensions
 
-extension LocalStrategyDetailView {
+extension StrategyDetailView {
     // Add the missing saveStrategyRating implementation
     func saveStrategyRating(strategy: LocalCopingStrategyDetail) {
         // Determine mood impact
@@ -2036,7 +2083,7 @@ extension LocalStrategyDetailView {
     }
 }
 
-struct LocalStrategyListView: View {
+struct StrategyListView: View {
     let title: String
     let strategies: [LocalCopingStrategyDetail]
     let onSelect: (LocalCopingStrategyDetail) -> Void
@@ -2047,7 +2094,7 @@ struct LocalStrategyListView: View {
     }
 }
 
-struct LocalCategoryFilterButton: View {
+struct CategoryFilterButton: View {
     let category: LocalCopingStrategyCategory?
     let isSelected: Bool
     let action: () -> Void
@@ -2111,19 +2158,44 @@ private func starRatingView(ratingValue: Binding<Int>) -> some View {
 }
 
 // Convert local CopingStrategyDetail to global CopingStrategyDetail
+extension LocalCopingStrategyDetail {
+    func toGlobal() -> CopingStrategyDetail {
+        return CopingStrategyDetail(
+            id: self.id,
+            title: self.title,
+            description: self.description,
+            category: mapCategoryToGlobal(self.category),
+            timeToComplete: self.timeToComplete,
+            steps: self.steps,
+            intensity: mapIntensityToGlobal(self.intensity),
+            moodTargets: self.moodTargets,
+            tips: self.tips,
+            resources: self.resources
+        )
+    }
+    
+    private func mapCategoryToGlobal(_ category: LocalCopingStrategyCategory) -> CopingStrategyCategory {
+        switch category {
+        case .mindfulness: return .mindfulness
+        case .cognitive: return .cognitive
+        case .physical: return .physical
+        case .social: return .social
+        case .creative: return .creative
+        case .selfCare: return .selfCare
+        }
+    }
+    
+    private func mapIntensityToGlobal(_ intensity: StrategyIntensity) -> CopingStrategyDetail.StrategyIntensity {
+        switch intensity {
+        case .quick: return .quick
+        case .moderate: return .moderate
+        case .intensive: return .intensive
+        }
+    }
+}
 
 // Update any code that shares strategies to convert between types
 private func shareStrategy(_ strategy: LocalCopingStrategyDetail) {
     // Convert to global type if needed for sharing
     let globalStrategy = strategy.toGlobal()
-    // Remaining content without duplicate declarations
-}
-
-// Create private type aliases for backward compatibility
-private typealias CopingStrategiesLibrary = LocalCopingStrategiesLibrary
-private typealias StrategyDetailView = LocalStrategyDetailView
-private typealias ShareToCommunityView = LocalShareToCommunityView
-private typealias SuccessAlertView = LocalSuccessAlertView
-private typealias FlowLayout = LocalFlowLayout
-private typealias StrategyListView = LocalStrategyListView
-private typealias CategoryFilterButton = LocalCategoryFilterButton
+// Remaining content without duplicate declarations

@@ -9,15 +9,15 @@ import Foundation
 import UserNotifications
 import SwiftUI
 
-class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
-    @Published var settings: UNNotificationSettings?
+public class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+    @Published public var settings: UNNotificationSettings?
     
-    override init() {
+    public override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = self
     }
     
-    func requestPermission() {
+    public func requestPermission() {
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .badge, .sound]) { granted, error in
                 if granted == true && error == nil {
@@ -30,7 +30,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     // Set up notification categories for actionable notifications
-    func setupNotificationCategories() {
+    public func setupNotificationCategories() {
         // Define the recommendation view action
         let viewAction = UNNotificationAction(
             identifier: "VIEW_ACTION",
@@ -53,12 +53,39 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
             options: []
         )
         
-        // Register the category
-        UNUserNotificationCenter.current().setNotificationCategories([recommendationCategory])
+        // Define follow-up action buttons for coping strategies
+        let helpfulAction = UNNotificationAction(
+            identifier: "HELPFUL_ACTION",
+            title: "Yes, it helped",
+            options: .foreground
+        )
+        
+        let notHelpfulAction = UNNotificationAction(
+            identifier: "NOT_HELPFUL_ACTION",
+            title: "No, not really",
+            options: .foreground
+        )
+        
+        let remindLaterAction = UNNotificationAction(
+            identifier: "REMIND_LATER_ACTION",
+            title: "Remind me later",
+            options: .destructive
+        )
+        
+        // Create the coping strategy follow-up category
+        let followupCategory = UNNotificationCategory(
+            identifier: "COPING_FOLLOWUP_CATEGORY",
+            actions: [helpfulAction, notHelpfulAction, remindLaterAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        
+        // Register both categories
+        UNUserNotificationCenter.current().setNotificationCategories([recommendationCategory, followupCategory])
     }
     
     // Send a recommendation notification
-    func sendRecommendationNotification(title: String, body: String) {
+    public func sendRecommendationNotification(title: String, body: String) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -85,9 +112,9 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
     
-    func scheduleReminderNotification() {
+    public func scheduleReminderNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "Daily Check-in"
+        content.title = "Daily Mood Check-in"
         content.body = "How are you feeling today? Taking a moment to track your mood helps build emotional resilience."
         content.sound = .default
         
@@ -115,7 +142,7 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     // Schedule an immediate notification
-    func scheduleImmediateNotification(title: String, body: String) {
+    public func scheduleImmediateNotification(title: String, body: String) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -140,16 +167,20 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     // Clear all pending notifications
-    func clearAllNotifications() {
+    public func clearAllNotifications() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
     
     // UNUserNotificationCenterDelegate methods
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
         completionHandler([.banner, .sound])
     }
     
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+    public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         // Handle notification response
         switch response.actionIdentifier {
         case "VIEW_ACTION":
@@ -166,10 +197,145 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
             // User dismissed the notification or tapped Dismiss
             print("User dismissed the notification")
             
+        // Handle coping strategy follow-up actions
+        case "HELPFUL_ACTION":
+            // Notify that the strategy was helpful
+            if let strategy = response.notification.request.content.userInfo["strategy"] as? String {
+                print("User found strategy '\(strategy)' helpful")
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("copingStrategyFollowUp"),
+                    object: nil,
+                    userInfo: ["strategy": strategy, "wasHelpful": true]
+                )
+            }
+            
+        case "NOT_HELPFUL_ACTION":
+            // Notify that the strategy was not helpful
+            if let strategy = response.notification.request.content.userInfo["strategy"] as? String {
+                print("User found strategy '\(strategy)' not helpful")
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("copingStrategyFollowUp"),
+                    object: nil,
+                    userInfo: ["strategy": strategy, "wasHelpful": false]
+                )
+            }
+            
+        case "REMIND_LATER_ACTION":
+            // Reschedule the follow-up for later
+            if let strategy = response.notification.request.content.userInfo["strategy"] as? String {
+                print("Rescheduling follow-up for strategy '\(strategy)'")
+                // Reschedule for 3 hours later
+                let content = UNMutableNotificationContent()
+                content.title = "How did it go?"
+                content.body = "Did the '\(strategy)' strategy help improve your mood?"
+                content.sound = .default
+                content.categoryIdentifier = "COPING_FOLLOWUP_CATEGORY"
+                content.userInfo = ["strategy": strategy]
+                
+                // Schedule for 3 hours from now
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3 * 60 * 60, repeats: false)
+                
+                // Create the request
+                let request = UNNotificationRequest(
+                    identifier: "coping-followup-reminder-\(UUID().uuidString)",
+                    content: content,
+                    trigger: trigger
+                )
+                
+                // Add the request to the notification center
+                UNUserNotificationCenter.current().add(request) { error in
+                    if let error = error {
+                        print("Error scheduling reminder notification: \(error)")
+                    }
+                }
+            }
+            
         default:
             break
         }
         
         completionHandler()
+    }
+    
+    // Context-aware notifications for coping strategies
+    public func scheduleContextAwareStrategyNotification(moodData: [MoodData], preferredTimes: [Date]? = nil) {
+        guard !moodData.isEmpty else { return }
+        
+        // 1. Analyze mood patterns
+        let recentHighAnxietyEntries = moodData.filter { 
+            $0.mood.lowercased().contains("anxiety") && $0.intensity > 6 && 
+            Calendar.current.isDateInToday($0.date) 
+        }
+        
+        let recentSadnessEntries = moodData.filter { 
+            $0.mood.lowercased().contains("sad") && $0.intensity > 5 &&
+            Calendar.current.isDateInToday($0.date) 
+        }
+        
+        // 2. Determine best time for notification
+        var scheduledTime: Date
+        
+        if let times = preferredTimes, !times.isEmpty {
+            // Use user's preferred times
+            scheduledTime = times.randomElement()!
+        } else {
+            // Default timing logic - suggest strategies during common stress periods
+            let calendar = Calendar.current
+            let now = Date()
+            let hour = calendar.component(.hour, from: now)
+            
+            if hour >= 21 || hour <= 5 {
+                // Evening/night - suggest relaxation for sleep
+                let dateComponents = DateComponents(hour: 21, minute: 30)
+                scheduledTime = calendar.nextDate(after: now, matching: dateComponents, matchingPolicy: .nextTime)!
+            } else if hour >= 7 && hour <= 9 {
+                // Morning - suggest energizing strategies
+                let dateComponents = DateComponents(hour: 8, minute: 15)
+                scheduledTime = calendar.nextDate(after: now, matching: dateComponents, matchingPolicy: .nextTime)!
+            } else {
+                // Mid-day check-in
+                let dateComponents = DateComponents(hour: 12, minute: 30)
+                scheduledTime = calendar.nextDate(after: now, matching: dateComponents, matchingPolicy: .nextTime)!
+            }
+        }
+        
+        // 3. Determine content based on detected patterns
+        let content = UNMutableNotificationContent()
+        content.badge = 1
+        content.sound = .default
+        content.categoryIdentifier = "COPING_SUGGESTION_CATEGORY"
+        
+        if !recentHighAnxietyEntries.isEmpty {
+            content.title = "Anxiety Management"
+            content.body = "You've been feeling anxious today. Would you like to try a quick grounding exercise?"
+            content.userInfo = ["strategyType": "grounding", "moodTrigger": "anxiety"]
+        } else if !recentSadnessEntries.isEmpty {
+            content.title = "Mood Lift Suggestion"
+            content.body = "We noticed you've been feeling down. A brief self-compassion exercise might help."
+            content.userInfo = ["strategyType": "selfCompassion", "moodTrigger": "sadness"]
+        } else {
+            // General resilience building
+            content.title = "Build Your Resilience"
+            content.body = "Taking a few minutes for a coping strategy can help you stay emotionally strong."
+            content.userInfo = ["strategyType": "general", "moodTrigger": "prevention"]
+        }
+        
+        // 4. Schedule the notification
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: scheduledTime),
+            repeats: false
+        )
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling context-aware notification: \(error)")
+            }
+        }
     }
 } 

@@ -10,67 +10,22 @@ import SwiftUI
 struct PersonalizedFeedbackView: View {
     @ObservedObject var analysisEngine: MoodAnalysisEngine
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedRecommendation: MoodRecommendation?
-    @State private var selectedStrategy: CopingStrategy?
-    @State private var selectedResource: RecommendedResource?
+    @State private var selectedRecommendation: EngineMoodRecommendation?
+    @State private var selectedStrategy: EngineCopingStrategy?
+    @State private var selectedResource: EngineRecommendedResource?
     @State private var showingStrategyDetail = false
     @State private var showingResourceDetail = false
     
     var body: some View {
         NavigationView {
+            // Breaking down the complex expression into smaller parts
             ScrollView {
                 VStack(spacing: 24) {
                     // Header with AI badge
-                    HStack {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 24))
-                            .foregroundColor(Color("Primary"))
-                        
-                        Text("AI-Powered Insights")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        // AI badge
-                        Text("AI")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color("Primary").opacity(0.9))
-                            )
-                    }
-                    .padding(.horizontal)
+                    headerView
                     
-                    // Recommendations list
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Personalized Recommendations")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                            .padding(.horizontal)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(analysisEngine.currentRecommendations) { recommendation in
-                                    recommendationCard(recommendation)
-                                        .onTapGesture {
-                                            withAnimation {
-                                                if selectedRecommendation?.id == recommendation.id {
-                                                    selectedRecommendation = nil
-                                                } else {
-                                                    selectedRecommendation = recommendation
-                                                }
-                                            }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
-                    }
+                    // Recommendations list section
+                    recommendationsSection
                     
                     // Selected recommendation details
                     if let recommendation = selectedRecommendation {
@@ -80,7 +35,7 @@ struct PersonalizedFeedbackView: View {
                 .padding(.vertical)
                 .sheet(isPresented: $showingStrategyDetail) {
                     if let strategy = selectedStrategy {
-                        StrategyDetailView(strategy: strategy)
+                        FeedbackStrategyDetailView(strategy: strategy)
                     }
                 }
                 .sheet(isPresented: $showingResourceDetail) {
@@ -103,9 +58,67 @@ struct PersonalizedFeedbackView: View {
         }
     }
     
+    // MARK: - Component Views
+    
+    // Header view component
+    private var headerView: some View {
+        HStack {
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 24))
+                .foregroundColor(Color("Primary"))
+            
+            Text("AI-Powered Insights")
+                .font(.title2)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            // AI badge
+            Text("AI")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color("Primary").opacity(0.9))
+                )
+        }
+        .padding(.horizontal)
+    }
+    
+    // Recommendations section
+    private var recommendationsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Personalized Recommendations")
+                .font(.headline)
+                .foregroundColor(.primary)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(analysisEngine.currentRecommendations) { recommendation in
+                        recommendationCard(recommendation)
+                            .onTapGesture {
+                                withAnimation {
+                                    if selectedRecommendation?.id == recommendation.id {
+                                        selectedRecommendation = nil
+                                    } else {
+                                        selectedRecommendation = recommendation
+                                    }
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+    
     // MARK: - Recommendation Card
     
-    private func recommendationCard(_ recommendation: MoodRecommendation) -> some View {
+    private func recommendationCard(_ recommendation: EngineMoodRecommendation) -> some View {
         return VStack(alignment: .leading, spacing: 8) {
             // Title with confidence indicator
             HStack {
@@ -174,7 +187,7 @@ struct PersonalizedFeedbackView: View {
     
     // MARK: - Recommendation Details
     
-    private func recommendationDetails(_ recommendation: MoodRecommendation) -> some View {
+    private func recommendationDetails(_ recommendation: EngineMoodRecommendation) -> some View {
         VStack(alignment: .leading, spacing: 24) {
             // Recommendation description
             VStack(alignment: .leading, spacing: 8) {
@@ -248,10 +261,10 @@ struct PersonalizedFeedbackView: View {
                     }) {
                         Label("Not Helpful", systemImage: "hand.thumbsdown")
                             .font(.body)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.secondary.opacity(0.2))
+                            .foregroundColor(.white)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 24)
+                            .background(Color.red.opacity(0.8))
                             .cornerRadius(AppLayout.cornerRadius)
                     }
                     
@@ -262,15 +275,14 @@ struct PersonalizedFeedbackView: View {
                         Label("Helpful", systemImage: "hand.thumbsup")
                             .font(.body)
                             .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color("Primary"))
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 24)
+                            .background(Color.green.opacity(0.8))
                             .cornerRadius(AppLayout.cornerRadius)
                     }
                 }
             }
             .padding()
-            .frame(maxWidth: .infinity)
             .background(Color("CardBackground"))
             .cornerRadius(AppLayout.cornerRadius)
             .padding(.horizontal)
@@ -279,15 +291,14 @@ struct PersonalizedFeedbackView: View {
     
     // MARK: - Strategy Card
     
-    private func strategyCard(_ strategy: CopingStrategy) -> some View {
+    private func strategyCard(_ strategy: EngineCopingStrategy) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Category badge
+            // Category and time
             HStack {
-                Image(systemName: strategy.category.iconName)
-                    .font(.system(size: 16))
-                    .foregroundColor(strategy.category.color)
-                
-                Text(strategy.category.rawValue)
+                Label(
+                    title: { Text(strategy.category.rawValue) },
+                    icon: { Image(systemName: strategy.category.iconName) }
+                )
                     .font(.caption)
                     .foregroundColor(strategy.category.color)
                 
@@ -298,36 +309,30 @@ struct PersonalizedFeedbackView: View {
                     .foregroundColor(.secondary)
             }
             
-            // Strategy title
+            // Title and description
             Text(strategy.title)
                 .font(.headline)
                 .foregroundColor(.primary)
                 .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
             
-            // Brief description
             Text(strategy.description)
-                .font(.body)
+                .font(.caption)
                 .foregroundColor(.secondary)
                 .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                
-            // "View Details" button
+            
+            Spacer()
+            
+            // View details button
             HStack {
                 Spacer()
                 
-                Button(action: {
-                    selectedStrategy = strategy
-                    showingStrategyDetail = true
-                }) {
-                    Text("View Details")
-                        .font(.caption)
-                        .foregroundColor(Color("Primary"))
-                }
+                Label("View", systemImage: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(strategy.category.color)
             }
         }
         .padding()
-        .frame(width: 280, height: 180)
+        .frame(width: 240, height: 180)
         .background(Color("CardBackground"))
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
@@ -335,8 +340,8 @@ struct PersonalizedFeedbackView: View {
     
     // MARK: - Resource Card
     
-    private func resourceCard(_ resource: RecommendedResource) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func resourceCard(_ resource: EngineRecommendedResource) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             // Resource type badge
             HStack {
                 Label(
@@ -344,67 +349,62 @@ struct PersonalizedFeedbackView: View {
                     icon: { Image(systemName: resource.type.iconName) }
                 )
                     .font(.caption)
-                    .foregroundColor(typeColor(for: resource.type))
+                    .foregroundColor(resource.type.color)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(typeColor(for: resource.type).opacity(0.1))
-                    .cornerRadius(10)
+                    .background(resource.type.color.opacity(0.1))
+                    .cornerRadius(8)
                 
                 Spacer()
+                
+                // New or updated badge
+                if resource.isNew {
+                    Text("NEW")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue)
+                        .cornerRadius(4)
+                }
             }
             
-            // Resource title
+            // Title and source
             Text(resource.title)
                 .font(.headline)
                 .foregroundColor(.primary)
                 .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            
+            if !resource.source.isEmpty {
+                Text(resource.source)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             Spacer()
             
-            // Brief description
-            Text(resource.description)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .lineLimit(3)
-            
-            // "View Resource" button
-            Button(action: {
-                selectedResource = resource
-                showingResourceDetail = true
-            }) {
-                Text("View Resource")
+            // View button
+            HStack {
+                Spacer()
+                
+                Label("View", systemImage: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(typeColor(for: resource.type))
-                    .cornerRadius(AppLayout.cornerRadius)
+                    .foregroundColor(resource.type.color)
             }
         }
         .padding()
-        .frame(width: 280, height: 200)
+        .frame(width: 240, height: 150)
         .background(Color("CardBackground"))
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
-    
-    private func typeColor(for type: AppResourceType) -> Color {
-        switch type {
-        case .article: return Color("Primary")
-        case .video: return Color("Joy")
-        case .audio: return Color("Calm")
-        case .app: return Color("Accent1")
-        case .book: return Color("Secondary")
-        case .exercise: return Color("Accent3")
-        }
-    }
 }
 
 // MARK: - Strategy Detail View
+// Renamed to avoid conflict with CopingStrategiesLibraryView
 
-struct StrategyDetailView: View {
-    let strategy: CopingStrategy
+struct FeedbackStrategyDetailView: View {
+    let strategy: EngineCopingStrategy
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -451,53 +451,34 @@ struct StrategyDetailView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                         
-                        ForEach(Array(strategy.steps.enumerated()), id: \.offset) { index, step in
-                            HStack(alignment: .top, spacing: 16) {
-                                Text("\(index + 1)")
-                                    .font(.caption)
-                                    .foregroundColor(.white)
-                                    .frame(width: 30, height: 30)
-                                    .background(strategy.category.color)
-                                    .clipShape(Circle())
+                        ForEach(0..<strategy.steps.count, id: \.self) { index in
+                            HStack(alignment: .top) {
+                                Text("\(index + 1).")
+                                    .font(.body.bold())
+                                    .foregroundColor(strategy.category.color)
+                                    .frame(width: 24, alignment: .center)
                                 
-                                Text(step)
+                                Text(strategy.steps[index])
                                     .font(.body)
                                     .foregroundColor(.primary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
-                    .padding(.top, 8)
                     
-                    // Try now button
-                    Button(action: {
-                        // In a real app, this would perhaps start a timer or guide
-                        dismiss()
-                    }) {
-                        Text("Try This Now")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(strategy.category.color)
-                            .cornerRadius(AppLayout.cornerRadius)
-                    }
-                    .padding(.top, 8)
+                    Spacer()
                 }
                 .padding()
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
+            .navigationBarTitle("Strategy Details", displayMode: .inline)
+            .navigationBarItems(trailing:
+                Button(action: {
+                    dismiss()
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
                 }
-            }
+            )
         }
     }
 }
@@ -505,7 +486,7 @@ struct StrategyDetailView: View {
 // MARK: - Resource Detail View
 
 struct ResourceDetailView: View {
-    let resource: RecommendedResource
+    let resource: EngineRecommendedResource
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     
@@ -514,137 +495,90 @@ struct ResourceDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Resource type badge
-                    HStack {
-                        Label(
-                            title: { Text(resource.type.rawValue) },
-                            icon: { Image(systemName: resource.type.iconName) }
-                        )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(16)
-                        
-                        Spacer()
-                    }
+                    Label(
+                        title: { Text(resource.type.rawValue) },
+                        icon: { Image(systemName: resource.type.iconName) }
+                    )
+                        .font(.subheadline)
+                        .foregroundColor(resource.type.color)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(resource.type.color.opacity(0.1))
+                        .cornerRadius(16)
                     
-                    // Resource title and description
+                    // Title and source
                     Text(resource.title)
                         .font(.title)
                         .foregroundColor(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     
+                    if !resource.source.isEmpty {
+                        Text("Source: \(resource.source)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Description
                     Text(resource.description)
                         .font(.body)
                         .foregroundColor(.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 8)
                     
-                    // Image if available
-                    if let imageURL = resource.imageURL {
-                        AsyncImage(url: imageURL) { phase in
-                            switch phase {
-                            case .empty:
-                                Rectangle()
-                                    .fill(Color.secondary.opacity(0.2))
-                                    .frame(height: 200)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 200)
-                                    .cornerRadius(AppLayout.cornerRadius)
-                            case .failure:
-                                Rectangle()
-                                    .fill(Color.secondary.opacity(0.2))
-                                    .frame(height: 200)
-                                    .overlay(
-                                        Image(systemName: "photo")
-                                            .font(.system(size: 40))
-                                            .foregroundColor(Color.secondary)
-                                    )
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .cornerRadius(AppLayout.cornerRadius)
-                    }
-                    
-                    // Open resource button
+                    // External link if available
                     if let url = resource.url {
                         Button(action: {
                             openURL(url)
                         }) {
-                            Label("Open Resource", systemImage: "arrow.up.forward.app")
-                                .font(.headline)
+                            Label("Open External Resource", systemImage: "link")
+                                .font(.body)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color("Primary"))
+                                .background(resource.type.color)
                                 .cornerRadius(AppLayout.cornerRadius)
                         }
-                    } else {
-                        // Fallback for resources without URLs
-                        Text("This resource will be available in a future update.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding()
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(AppLayout.cornerRadius)
                     }
+                    
+                    Spacer()
                 }
                 .padding()
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
+            .navigationBarTitle("Resource Details", displayMode: .inline)
+            .navigationBarItems(trailing:
+                Button(action: {
+                    dismiss()
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
                 }
-            }
+            )
         }
     }
 }
 
-// MARK: - Preview Provider
-
+// MARK: - Preview
 struct PersonalizedFeedbackView_Previews: PreviewProvider {
     static var previews: some View {
-        // Create a mock MoodStore and MoodAnalysisEngine with sample data
-        let mockMoodStore = MoodStore(context: PersistenceController.preview.container.viewContext)
-        let mockAnalysisEngine = MoodAnalysisEngine(moodStore: mockMoodStore)
+        // Create an EngineMoodStore instance from the MoodStore
+        let context = PersistenceController.preview.container.viewContext
+        let moodStore = MoodStore(context: context)
+        let engineMoodStore = EngineMoodStore() // Create a new EngineMoodStore instance
+        let analysisEngine = MoodAnalysisEngine(moodStore: engineMoodStore)
         
-        // Add a mock recommendation for preview
-        let mockStrategy = CopingStrategy(
-            title: "Grounding Technique",
-            description: "A simple mindfulness exercise to reduce anxiety by connecting with your senses.",
-            timeToComplete: "5 minutes",
-            steps: [
-                "Find a comfortable position and take a slow, deep breath.",
-                "Notice 5 things you can see around you.",
-                "Acknowledge 4 things you can touch or feel.",
-                "Listen for 3 sounds in your environment.",
-                "Identify 2 things you can smell.",
-                "Notice 1 thing you can taste."
-            ],
-            category: .mindfulness
-        )
-        
-        let mockResource = RecommendedResource(
-            title: "The Science Behind Anxiety After Rejection",
-            type: .article,
-            description: "Learn how rejection triggers anxiety responses in the brain and research-backed techniques to manage these feelings.",
-            url: URL(string: "https://www.psychologytoday.com"),
-            imageURL: nil
-        )
-        
-        // Return preview with mock data
-        return PersonalizedFeedbackView(analysisEngine: mockAnalysisEngine)
+        return PersonalizedFeedbackView(analysisEngine: analysisEngine)
+    }
+}
+
+// Add an extension to MoodEngineCopingStrategyCategory with the iconName property 
+extension MoodEngineCopingStrategyCategory {
+    var iconName: String {
+        switch self {
+        case .mindfulness: return "brain.head.profile"
+        case .cognitive: return "lightbulb"
+        case .physical: return "figure.walk"
+        case .social: return "person.2"
+        case .creative: return "paintpalette"
+        case .selfCare: return "heart.fill"
+        }
     }
 } 

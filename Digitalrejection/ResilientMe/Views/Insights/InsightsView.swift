@@ -12,9 +12,12 @@ import Combine
 
 struct InsightsView: View {
     @ObservedObject var moodAnalysisEngine: MoodAnalysisEngine
+    @ObservedObject private var strategyStore = StrategyEffectivenessStore.shared
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingRecommendations = false
     @State private var animateCharts = false
+    @State private var showingStrategyDetails = false
+    @State private var selectedStrategy: String?
     @Environment(\.managedObjectContext) private var viewContext
     
     // Add explicit initializer
@@ -59,6 +62,17 @@ struct InsightsView: View {
                     
                     // Coping strategies effectiveness
                     copingStrategiesCard
+                    
+                    // Strategy rating effectiveness
+                    strategyEffectivenessCard
+                    
+                    // Strategy usage progress
+                    strategyUsageCard
+                    
+                    // Milestone celebrations
+                    if let milestone = getMilestoneAchievement() {
+                        milestoneCard(milestone)
+                    }
                 }
                 .padding()
                 .onAppear {
@@ -75,6 +89,11 @@ struct InsightsView: View {
         }
         .sheet(isPresented: $showingRecommendations) {
             PersonalizedFeedbackView(analysisEngine: moodAnalysisEngine)
+        }
+        .sheet(isPresented: $showingStrategyDetails) {
+            if let strategy = selectedStrategy {
+                StrategyDetailsView(strategyName: strategy)
+            }
         }
     }
     
@@ -297,6 +316,273 @@ struct InsightsView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
     
+    // MARK: - Strategy Effectiveness Card
+    
+    private var strategyEffectivenessCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Card header
+            HStack {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color("Primary"))
+                
+                Text("Strategy Effectiveness")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: {
+                    // Open more details
+                }) {
+                    Text("Details")
+                        .font(.caption)
+                        .foregroundColor(Color("Primary"))
+                }
+            }
+            
+            // Chart section
+            VStack(alignment: .leading, spacing: 12) {
+                if strategyStore.ratingData.isEmpty {
+                    emptyStrategyCard
+                } else {
+                    effectivenessChartSection
+                }
+            }
+            .padding()
+            .background(Color("CardBackground"))
+            .cornerRadius(12)
+            
+            // Tap to view more details
+            Text("Tap on a strategy to see detailed progress")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color("CardBackground"))
+        .cornerRadius(12)
+    }
+    
+    private var effectivenessChartSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Most Effective Strategies")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            effectivenessChart
+            
+            // Legend
+            HStack {
+                Text("1")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text("5")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, -8)
+        }
+    }
+    
+    private var effectivenessChart: some View {
+        Chart {
+            ForEach(Array(strategyStore.getMostEffectiveStrategies().enumerated()), id: \.element.strategy) { index, item in
+                BarMark(
+                    x: .value("Effectiveness", animateCharts ? item.rating : 0),
+                    y: .value("Strategy", shortenStrategy(item.strategy))
+                )
+                .foregroundStyle(getColorForRating(item.rating))
+            }
+        }
+        .frame(height: min(CGFloat(strategyStore.getMostEffectiveStrategies().count * 50), 200))
+        .animation(.easeInOut, value: animateCharts)
+    }
+    
+    // MARK: - Strategy Usage Progress
+    
+    private var strategyUsageCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Card header
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color("Primary"))
+                
+                Text("Strategy Usage")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: {
+                    // Open more details
+                }) {
+                    Text("Details")
+                        .font(.caption)
+                        .foregroundColor(Color("Primary"))
+                }
+            }
+            
+            // Chart section
+            VStack(alignment: .leading, spacing: 12) {
+                if strategyStore.ratingData.isEmpty {
+                    emptyStrategyCard
+                } else {
+                    strategyUsageSection
+                }
+            }
+            .padding()
+            .background(Color("CardBackground"))
+            .cornerRadius(12)
+            
+            // Tap to view more details
+            Text("Tap on a strategy to see detailed progress")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color("CardBackground"))
+        .cornerRadius(12)
+    }
+    
+    private var strategyUsageSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Most Used Strategies")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            strategyUsageChart
+            
+            // Legend
+            HStack {
+                Text("0")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text("\(strategyStore.getMostUsedStrategies().map { $0.count }.max() ?? 0)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, -8)
+        }
+    }
+    
+    private var strategyUsageChart: some View {
+        Chart {
+            ForEach(Array(strategyStore.getMostUsedStrategies().enumerated()), id: \.element.strategy) { index, item in
+                BarMark(
+                    x: .value("Usage", animateCharts ? Double(item.count) : 0),
+                    y: .value("Strategy", shortenStrategy(item.strategy))
+                )
+                .foregroundStyle(Color("Primary").opacity(0.8))
+            }
+        }
+        .frame(height: min(CGFloat(strategyStore.getMostUsedStrategies().count * 50), 200))
+        .animation(.easeInOut, value: animateCharts)
+    }
+    
+    private func milestoneCard(_ milestone: Milestone) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Card header with celebration icon
+            HStack {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.yellow)
+                
+                Text("Milestone Achieved!")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("New")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange)
+                    .cornerRadius(12)
+            }
+            
+            // Milestone details
+            VStack(alignment: .leading, spacing: 12) {
+                Text(milestone.title)
+                    .font(.title3)
+                    .foregroundColor(.primary)
+                    .bold()
+                
+                Text(milestone.description)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                
+                // Visual representation of achievement
+                HStack(spacing: 0) {
+                    ForEach(0..<5) { i in
+                        Image(systemName: "star.fill")
+                            .foregroundColor(i < milestone.level ? .yellow : Color.gray.opacity(0.3))
+                            .font(.system(size: 24))
+                    }
+                }
+                .padding(.vertical, 8)
+                
+                // Share button
+                Button(action: {
+                    // Share milestone
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Share Achievement")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .background(Color("Primary"))
+                    .cornerRadius(8)
+                }
+            }
+            .padding()
+            .background(Color("CardBackground"))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(LinearGradient(
+                        gradient: Gradient(colors: [.yellow, .orange]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ), lineWidth: 2)
+            )
+        }
+        .padding()
+        .background(Color("CardBackground"))
+        .cornerRadius(12)
+    }
+    
+    private var emptyStrategyCard: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "star.slash")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
+                .padding()
+            
+            Text("No strategy ratings yet")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("Rate your strategies to track their effectiveness")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+    }
+    
     // MARK: - Helper Functions
     
     private func getMoodColor(mood: String) -> UIColor {
@@ -384,6 +670,296 @@ struct InsightsView: View {
         StrategyEffectiveness(strategy: "Social Support", effectiveness: 90),
         StrategyEffectiveness(strategy: "Reframing", effectiveness: 70)
     ]
+    
+    // MARK: - Helper Functions for Strategy Tracking
+    
+    private func shortenStrategy(_ strategy: String) -> String {
+        return strategy.count > 25 ? strategy.prefix(22) + "..." : strategy
+    }
+    
+    private func getColorForRating(_ rating: Double) -> Color {
+        switch rating {
+        case 0..<2:
+            return .red
+        case 2..<3:
+            return .orange
+        case 3..<4:
+            return .yellow
+        case 4...5:
+            return .green
+        default:
+            return .gray
+        }
+    }
+    
+    struct Milestone {
+        let id = UUID()
+        let title: String
+        let description: String
+        let level: Int // 1-5 stars
+    }
+    
+    private func getMilestoneAchievement() -> Milestone? {
+        // Check for consistent high ratings milestone
+        if !strategyStore.ratingData.isEmpty {
+            let highRatings = strategyStore.ratingData.filter { $0.rating >= 4 }.count
+            let totalRatings = strategyStore.ratingData.count
+            let ratio = Double(highRatings) / Double(totalRatings)
+            
+            if totalRatings >= 5 && ratio >= 0.8 {
+                return Milestone(
+                    title: "Strategy Mastery",
+                    description: "You've found strategies that work exceptionally well! You rated 80% of your strategies as highly effective.",
+                    level: 5
+                )
+            }
+        }
+        
+        // Check for usage consistency milestone
+        let mostUsedStrategies = strategyStore.getMostUsedStrategies()
+        if let mostUsedStrategy = mostUsedStrategies.first,
+           mostUsedStrategy.count >= 5 {
+            return Milestone(
+                title: "Consistency Champion",
+                description: "You've used the same strategy 5+ times, showing great commitment to building resilience habits!",
+                level: 4
+            )
+        }
+        
+        // Check for diversity milestone
+        let uniqueStrategies = Set(strategyStore.ratingData.map { $0.strategy }).count
+        if uniqueStrategies >= 3 {
+            return Milestone(
+                title: "Strategy Explorer",
+                description: "You've tried 3 or more different coping strategies. Exploring different approaches leads to better resilience!",
+                level: 3
+            )
+        }
+        
+        // First rating milestone
+        if strategyStore.ratingData.count == 1 {
+            return Milestone(
+                title: "First Step Complete",
+                description: "You've completed and rated your first coping strategy. This is the first step to building resilience!",
+                level: 1
+            )
+        }
+        
+        return nil
+    }
+}
+
+// MARK: - Strategy Details View
+
+struct StrategyDetailsView: View {
+    let strategyName: String
+    @ObservedObject private var strategyStore = StrategyEffectivenessStore.shared
+    @Environment(\.presentationMode) var presentationMode
+    @State private var animateCharts = false
+    
+    private var averageRating: String {
+        String(format: "%.1f", strategyStore.getAverageRating(for: strategyName))
+    }
+    
+    private var completionCount: String {
+        "\(strategyStore.getCompletionCount(for: strategyName))"
+    }
+    
+    private var ratingHistory: [(date: Date, rating: Int)] {
+        strategyStore.getRatingHistory(for: strategyName)
+    }
+    
+    private var hasRatingHistory: Bool {
+        !ratingHistory.isEmpty
+    }
+    
+    private var averageRatingValue: Double {
+        strategyStore.getAverageRating(for: strategyName)
+    }
+    
+    private var chartContent: some View {
+        Chart {
+            ForEach(Array(ratingHistory.enumerated()), id: \.offset) { index, rating in
+                LineMark(
+                    x: .value("Use", index + 1),
+                    y: .value("Rating", animateCharts ? Double(rating.rating) : 0)
+                )
+                .foregroundStyle(Color("Primary"))
+                
+                PointMark(
+                    x: .value("Use", index + 1),
+                    y: .value("Rating", animateCharts ? Double(rating.rating) : 0)
+                )
+                .foregroundStyle(Color("Primary"))
+            }
+            
+            RuleMark(y: .value("Average", averageRatingValue))
+                .foregroundStyle(.gray.opacity(0.5))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                .annotation(position: .top, alignment: .trailing) {
+                    Text("Average: \(averageRating)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+        }
+        .frame(height: 200)
+        .animation(.easeInOut, value: animateCharts)
+    }
+    
+    private var ratingHistorySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Strategy Usage History")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            if !ratingHistory.isEmpty {
+                ForEach(Array(ratingHistory.enumerated()), id: \.offset) { index, rating in
+                    ratingHistoryRow(rating)
+                }
+            } else {
+                Text("No usage history available yet")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+            }
+        }
+        .padding()
+        .background(Color("CardBackground"))
+        .cornerRadius(12)
+    }
+    
+    private func ratingHistoryRow(_ rating: (date: Date, rating: Int)) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(formatDate(rating.date))
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+            }
+            
+            Spacer()
+            
+            // Rating stars
+            HStack(spacing: 2) {
+                ForEach(1...5, id: \.self) { i in
+                    Image(systemName: i <= rating.rating ? "star.fill" : "star")
+                        .font(.system(size: 12))
+                        .foregroundColor(i <= rating.rating ? .yellow : .gray)
+                }
+            }
+        }
+        .padding()
+        .background(Color("Background"))
+        .cornerRadius(8)
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Overview card
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(strategyName)
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                            .bold()
+                        
+                        HStack(spacing: 24) {
+                            statCard(
+                                value: averageRating,
+                                label: "Average Rating",
+                                icon: "star.fill",
+                                color: .yellow
+                            )
+                            
+                            statCard(
+                                value: completionCount,
+                                label: "Times Used",
+                                icon: "checkmark.circle.fill",
+                                color: Color("Primary")
+                            )
+                        }
+                    }
+                    .padding()
+                    .background(Color("CardBackground"))
+                    .cornerRadius(12)
+                    
+                    // Effectiveness trend chart
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Effectiveness Over Time")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        if hasRatingHistory {
+                            chartContent
+                            
+                            Text("Your ratings show how this strategy's effectiveness has changed over time")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        } else {
+                            Text("No rating history available yet")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                        }
+                    }
+                    .padding()
+                    .background(Color("CardBackground"))
+                    .cornerRadius(12)
+                    
+                    // Use history
+                    ratingHistorySection
+                }
+                .padding()
+            }
+            .navigationTitle("Strategy Progress")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                // Animate charts when view appears
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        animateCharts = true
+                    }
+                }
+            }
+        }
+    }
+    
+    private func statCard(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.primary)
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color("Background"))
+        .cornerRadius(8)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
 }
 
 // Remove this preview provider for now as it may reference unavailable components

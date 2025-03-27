@@ -2,25 +2,50 @@ import Foundation
 import CoreData
 import SwiftUI
 
+// MARK: - ChartData for visualization
+struct ChartData: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: Double
+    let percentage: Double
+}
+
 // MARK: - MoodData for view use
-struct MoodData: Identifiable, Hashable {
-    let id: String
-    let date: Date
-    let mood: String
-    let customMood: String? // For user-defined moods
-    let intensity: Int
-    let note: String?
-    let rejectionRelated: Bool
-    let rejectionTrigger: String?
-    let copingStrategy: String?
-    let journalPromptShown: Bool // Track if a journal prompt was shown
-    let recommendedCopingStrategies: [String]? // AI-recommended strategies
+public struct MoodData: Identifiable, Hashable {
+    public let id: String
+    public let date: Date
+    public let mood: String
+    public let customMood: String? // For user-defined moods
+    public let intensity: Int
+    public let note: String?
+    public let rejectionRelated: Bool
+    public let rejectionTrigger: String?
+    public let copingStrategy: String?
+    public let journalPromptShown: Bool // Track if a journal prompt was shown
+    public let recommendedCopingStrategies: [String]? // AI-recommended strategies
     
-    static func == (lhs: MoodData, rhs: MoodData) -> Bool {
+    public init(id: String, date: Date, mood: String, customMood: String? = nil, 
+                intensity: Int, note: String? = nil, rejectionRelated: Bool = false, 
+                rejectionTrigger: String? = nil, copingStrategy: String? = nil, 
+                journalPromptShown: Bool = false, recommendedCopingStrategies: [String]? = nil) {
+        self.id = id
+        self.date = date
+        self.mood = mood
+        self.customMood = customMood
+        self.intensity = intensity
+        self.note = note
+        self.rejectionRelated = rejectionRelated
+        self.rejectionTrigger = rejectionTrigger
+        self.copingStrategy = copingStrategy
+        self.journalPromptShown = journalPromptShown
+        self.recommendedCopingStrategies = recommendedCopingStrategies
+    }
+    
+    public static func == (lhs: MoodData, rhs: MoodData) -> Bool {
         lhs.id == rhs.id
     }
     
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
 }
@@ -65,7 +90,7 @@ struct RejectionTriggers {
 }
 
 // MARK: - CopingStrategies for suggesting and tracking methods
-struct CopingStrategies {
+struct CopingStrategyCategories {
     static let active = ["Physical activity", "Creative expression", "Talking to someone", "Problem solving"]
     static let cognitive = ["Positive self-talk", "Reframing the situation", "Finding the lesson", "Focusing on strengths"]
     static let relaxation = ["Deep breathing", "Meditation", "Progressive muscle relaxation", "Nature walk"]
@@ -114,7 +139,7 @@ struct CopingStrategies {
 
 // MARK: - JournalPrompts for guided reflection
 struct JournalPrompts {
-    static func forMood(_ mood: String, trigger: String? = nil) -> String {
+    static func getPromptForMood(_ mood: String, trigger: String? = nil) -> String {
         // First, handle rejection-specific prompts if applicable
         if let trigger = trigger {
             // Prompts specifically for rejection experiences
@@ -170,6 +195,319 @@ struct JournalPrompts {
         
         // Default prompt
         return "How are you feeling right now, and what might have contributed to this feeling? What would support you in this moment?"
+    }
+}
+
+// MARK: - Strategy Effectiveness Store
+class StrategyEffectivenessStore: ObservableObject {
+    static let shared = StrategyEffectivenessStore()
+    
+    @Published var ratingData: [StrategyRating] = []
+    @Published var recommendationWeights: [String: Double] = [:]
+    @Published var userPreferences: UserStrategyPreferences
+    
+    private let userDefaults = UserDefaults.standard
+    
+    struct StrategyRating: Codable, Identifiable {
+        let id: UUID
+        let strategy: String
+        let rating: Int
+        let timestamp: Date
+        let moodBefore: String?
+        let moodAfter: String?
+        let moodImpact: String?
+        let notes: String?
+        let completionTime: TimeInterval?
+    }
+    
+    struct UserStrategyPreferences: Codable {
+        var preferredDuration: StrategyDuration
+        var preferredTimeOfDay: [TimeOfDay]
+        var avoidedCategories: [String]
+        var favoriteCategories: [String]
+        
+        enum StrategyDuration: String, Codable, CaseIterable {
+            case veryShort = "Under 2 minutes"
+            case short = "2-5 minutes"
+            case medium = "5-15 minutes"
+            case long = "Over 15 minutes"
+        }
+        
+        enum TimeOfDay: String, Codable, CaseIterable {
+            case morning = "Morning"
+            case afternoon = "Afternoon"
+            case evening = "Evening"
+            case night = "Night"
+        }
+        
+        static var `default`: UserStrategyPreferences {
+            return UserStrategyPreferences(
+                preferredDuration: .short,
+                preferredTimeOfDay: [.morning, .evening],
+                avoidedCategories: [],
+                favoriteCategories: []
+            )
+        }
+    }
+    
+    init() {
+        // Initialize with default user preferences
+        userPreferences = UserStrategyPreferences.default
+        
+        // Load existing data
+        if let savedRatings = userDefaults.data(forKey: "strategyRatings") {
+            if let decoded = try? JSONDecoder().decode([StrategyRating].self, from: savedRatings) {
+                ratingData = decoded
+            }
+        }
+        
+        if let savedWeights = userDefaults.data(forKey: "recommendationWeights") {
+            if let decoded = try? JSONDecoder().decode([String: Double].self, from: savedWeights) {
+                recommendationWeights = decoded
+            }
+        } else {
+            // Initialize with default weights
+            recommendationWeights = [
+                "mindfulness": 1.0,
+                "cognitive": 1.0,
+                "physical": 1.0,
+                "social": 1.0,
+                "creative": 1.0,
+                "selfCare": 1.0
+            ]
+        }
+        
+        if let savedPreferences = userDefaults.data(forKey: "userStrategyPreferences") {
+            if let decoded = try? JSONDecoder().decode(UserStrategyPreferences.self, from: savedPreferences) {
+                userPreferences = decoded
+            }
+        }
+    }
+    
+    private func initializeDefaultWeights() {
+        recommendationWeights = [
+            "mindfulness": 1.0,
+            "cognitive": 1.0,
+            "physical": 1.0,
+            "social": 1.0,
+            "creative": 1.0,
+            "selfCare": 1.0
+        ]
+    }
+    
+    // Add a new rating for a strategy
+    func addRating(
+        for strategy: String,
+        rating: Int,
+        moodBefore: String? = nil,
+        moodAfter: String? = nil,
+        moodImpact: String? = nil,
+        notes: String? = nil,
+        completionTime: TimeInterval? = nil
+    ) {
+        let newRating = StrategyRating(
+            id: UUID(),
+            strategy: strategy,
+            rating: rating,
+            timestamp: Date(),
+            moodBefore: moodBefore,
+            moodAfter: moodAfter,
+            moodImpact: moodImpact,
+            notes: notes,
+            completionTime: completionTime
+        )
+        
+        ratingData.append(newRating)
+        saveRatings()
+        
+        // Update recommendation weights based on new rating
+        updateRecommendationWeights()
+    }
+    
+    // Update weighting for recommendations based on user feedback
+    private func updateRecommendationWeights() {
+        // Skip if not enough data
+        guard ratingData.count >= 3 else { return }
+        
+        // Get ratings from the past 30 days for more relevant weighting
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
+        let recentRatings = ratingData.filter { $0.timestamp > thirtyDaysAgo }
+        
+        // Group ratings by strategy category (you'll need to extract category from strategy name or add it to StrategyRating)
+        var categoryRatings: [String: [Int]] = [:]
+        
+        for rating in recentRatings {
+            // This is a simplified example - in reality, you'd determine the category from the strategy
+            let category = getCategoryForStrategy(rating.strategy)
+            if categoryRatings[category] == nil {
+                categoryRatings[category] = []
+            }
+            categoryRatings[category]?.append(rating.rating)
+        }
+        
+        // Calculate average rating per category
+        for (category, ratings) in categoryRatings {
+            let average = Double(ratings.reduce(0, +)) / Double(ratings.count)
+            
+            // Weight is scaled between 0.5 and 2.0 based on ratings (1-5)
+            // 1 star = 0.5 weight, 5 stars = 2.0 weight
+            let weight = 0.5 + (average - 1.0) * 0.375 // Maps 1-5 to 0.5-2.0
+            
+            // Update weight (with some inertia from existing weight)
+            if let existingWeight = recommendationWeights[category] {
+                recommendationWeights[category] = existingWeight * 0.7 + weight * 0.3
+            } else {
+                recommendationWeights[category] = weight
+            }
+        }
+        
+        // Also consider moodImpact if available
+        let highImpactRatings = recentRatings.filter { $0.moodImpact == "Major improvement" }
+        for rating in highImpactRatings {
+            let category = getCategoryForStrategy(rating.strategy)
+            if let existingWeight = recommendationWeights[category] {
+                // Boost weight further for strategies with major mood improvements
+                recommendationWeights[category] = min(existingWeight * 1.1, 2.5)
+            }
+        }
+        
+        saveWeights()
+    }
+    
+    // Get strategy category - in a real app, this would use your data model
+    private func getCategoryForStrategy(_ strategy: String) -> String {
+        // This is a placeholder implementation
+        // In your app, you would look up the actual category from your data model
+        if strategy.lowercased().contains("breath") || strategy.lowercased().contains("meditat") {
+            return "mindfulness"
+        } else if strategy.lowercased().contains("thought") || strategy.lowercased().contains("reframe") {
+            return "cognitive"
+        } else if strategy.lowercased().contains("walk") || strategy.lowercased().contains("exercise") {
+            return "physical"
+        } else if strategy.lowercased().contains("friend") || strategy.lowercased().contains("social") {
+            return "social"
+        } else if strategy.lowercased().contains("creat") || strategy.lowercased().contains("art") {
+            return "creative"
+        } else {
+            return "selfCare"
+        }
+    }
+    
+    // Updates user preferences
+    func updateUserPreferences(_ newPreferences: UserStrategyPreferences) {
+        userPreferences = newPreferences
+        
+        if let encoded = try? JSONEncoder().encode(userPreferences) {
+            userDefaults.set(encoded, forKey: "userStrategyPreferences")
+        }
+    }
+    
+    // Save ratings to UserDefaults
+    private func saveRatings() {
+        if let encoded = try? JSONEncoder().encode(ratingData) {
+            userDefaults.set(encoded, forKey: "strategyRatings")
+        }
+    }
+    
+    // Save weights to UserDefaults
+    private func saveWeights() {
+        if let encoded = try? JSONEncoder().encode(recommendationWeights) {
+            userDefaults.set(encoded, forKey: "recommendationWeights")
+        }
+    }
+    
+    // Get recommended strategies based on learned preferences
+    func getRecommendedStrategiesFor(
+        mood: String,
+        intensity: Int,
+        preferShort: Bool = false
+    ) -> [String: Double] {
+        // This would return a dictionary of strategy IDs with their recommendation scores
+        // The calling code would then sort and select strategies based on these scores
+        
+        // A more sophisticated implementation would consider:
+        // 1. Time of day and user's preferred times
+        // 2. Duration preferences
+        // 3. Category weights from past feedback
+        // 4. Emotional state/mood matching
+        // 5. Mixing familiar strategies with new ones
+        
+        // This is just a placeholder implementation
+        return recommendationWeights
+    }
+    
+    // Get completion count for a strategy
+    func getCompletionCount(for strategy: String) -> Int {
+        return ratingData.filter { $0.strategy == strategy }.count
+    }
+    
+    // Get average rating for a strategy
+    func getAverageRating(for strategy: String) -> Double {
+        let ratings = ratingData.filter { $0.strategy == strategy }.map { $0.rating }
+        guard !ratings.isEmpty else { return 0 }
+        return Double(ratings.reduce(0, +)) / Double(ratings.count)
+    }
+    
+    // Get most effective strategies
+    func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
+        var strategyRatings: [String: [Int]] = [:]
+        
+        // Group ratings by strategy
+        for rating in ratingData {
+            if strategyRatings[rating.strategy] == nil {
+                strategyRatings[rating.strategy] = []
+            }
+            strategyRatings[rating.strategy]?.append(rating.rating)
+        }
+        
+        // Calculate average rating for each strategy
+        let averages = strategyRatings.map { (strategy, ratings) in
+            (strategy: strategy, rating: Double(ratings.reduce(0, +)) / Double(ratings.count))
+        }
+        
+        // Sort by rating and return top 5
+        return averages.sorted { $0.rating > $1.rating }.prefix(5).map { $0 }
+    }
+    
+    // Get most used strategies
+    func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
+        var strategyCounts: [String: Int] = [:]
+        
+        // Count usage of each strategy
+        for rating in ratingData {
+            strategyCounts[rating.strategy, default: 0] += 1
+        }
+        
+        // Convert to array and sort by count
+        return strategyCounts.map { (strategy: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+            .prefix(5)
+            .map { $0 }
+    }
+    
+    // Get strategy trend over time
+    func getStrategyTrend(for strategy: String) -> [Double] {
+        // Get all ratings for this strategy, sorted by date
+        let ratings = ratingData
+            .filter { $0.strategy == strategy }
+            .sorted { $0.timestamp < $1.timestamp }
+            .map { Double($0.rating) }  // Convert Int to Double here
+        
+        // If we have less than 5 ratings, pad with zeros
+        if ratings.count < 5 {
+            return ratings + Array(repeating: 0.0, count: 5 - ratings.count)
+        }
+        
+        // Return the last 5 ratings
+        return Array(ratings.suffix(5))
+    }
+    
+    // Get rating history for a strategy
+    func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
+        return ratingData
+            .filter { $0.strategy == strategy }
+            .sorted { $0.timestamp < $1.timestamp }
+            .map { (date: $0.timestamp, rating: $0.rating) }
     }
 }
 
@@ -248,7 +586,7 @@ class MoodStore: ObservableObject {
         
         // Generate recommended coping strategies based on mood and trigger
         let recommendedStrategies = rejectionRelated ? 
-            CopingStrategies.recommendFor(mood: mood, trigger: rejectionTrigger) : nil
+            CopingStrategyCategories.recommendFor(mood: mood, trigger: rejectionTrigger) : nil
         
         let newEntry = MoodEntryEntity(context: context)
         newEntry.id = UUID().uuidString
@@ -425,7 +763,7 @@ class MoodStore: ObservableObject {
         }
         
         // Get the appropriate prompt content
-        let promptContent = JournalPrompts.forMood(entry.mood, trigger: entry.rejectionTrigger)
+        let promptContent = JournalPrompts.getPromptForMood(entry.mood, trigger: entry.rejectionTrigger)
         
         // Suggest appropriate tags
         var suggestedTags = ["Growth"]
@@ -437,5 +775,22 @@ class MoodStore: ObservableObject {
         }
         
         return (title, promptContent, suggestedTags)
+    }
+    
+    func getMoodDistributionData() -> [ChartData] {
+        let moodCounts = moodEntries.reduce(into: [:]) { counts, entry in
+            counts[entry.mood, default: 0] += 1
+        }
+        
+        let total = Double(moodEntries.count)
+        let sortedMoods = moodCounts.sorted { $0.value > $1.value }
+        
+        return sortedMoods.map { mood, count in
+            ChartData(
+                label: mood,
+                value: Double(count),
+                percentage: total > 0 ? (Double(count) / total) * 100 : 0
+            )
+        }
     }
 } 

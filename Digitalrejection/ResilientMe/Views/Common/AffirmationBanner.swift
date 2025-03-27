@@ -10,7 +10,7 @@ struct AffirmationBanner: View {
             if isExpanded {
                 VStack(spacing: 8) {
                     HStack {
-                        Text("Daily Affirmation")
+                        Text("Today's Affirmation")
                             .font(AppTextStyles.h4)
                             .foregroundColor(AppColors.textDark)
                         
@@ -49,10 +49,12 @@ struct AffirmationBanner: View {
                     }
                 }
                 .padding()
-                .background(AppColors.accent1.opacity(0.3))
+                .background(AppColors.cardBackground)
                 .cornerRadius(AppLayout.cornerRadius)
+                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                 .padding(.horizontal)
-                .padding(.top)
+                .padding(.top, 10)
+                .padding(.bottom, 5)
                 .accessibleCard(label: "Daily affirmation", hint: "An affirmation to boost your resilience")
             } else {
                 Button(action: {
@@ -65,7 +67,7 @@ struct AffirmationBanner: View {
                         Image(systemName: "quote.bubble")
                             .font(.system(size: 14))
                         
-                        Text("Show Daily Affirmation")
+                        Text("Show Today's Affirmation")
                             .font(AppTextStyles.body3)
                         
                         Image(systemName: "chevron.down")
@@ -74,10 +76,12 @@ struct AffirmationBanner: View {
                     .foregroundColor(AppColors.textMedium)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(AppColors.background)
+                    .background(AppColors.cardBackground)
                     .cornerRadius(AppLayout.cornerRadius)
+                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 }
-                .padding(.top, 8)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
                 .accessibilityLabel("Expand affirmation banner")
             }
         }
@@ -98,6 +102,7 @@ struct AffirmationBanner: View {
     }
 }
 
+#if DEBUG
 // MARK: - Preview
 struct AffirmationBanner_Previews: PreviewProvider {
     static var previews: some View {
@@ -105,6 +110,7 @@ struct AffirmationBanner_Previews: PreviewProvider {
             AffirmationBanner(affirmation: "Your worth is not determined by external validation.")
             Spacer()
         }
-        .background(AppColors.background)
+        .background(Color(UIColor.systemBackground))
     }
-} 
+}
+#endif 

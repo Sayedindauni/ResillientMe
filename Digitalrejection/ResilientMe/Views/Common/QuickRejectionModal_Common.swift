@@ -77,16 +77,16 @@ struct QuickRejectionModalCommon: View {
                                         selectedTrigger = trigger
                                         HapticFeedback.light()
                                     }) {
+                                        let isSelected = selectedTrigger == trigger
+                                        let textColor = isSelected ? Color.white : AppColors.textDark
+                                        let backgroundColor = isSelected ? AppColors.primary : AppColors.background
+                                        
                                         Text(trigger)
                                             .font(AppTextStyles.body3)
-                                            .foregroundColor(selectedTrigger == trigger ? .white : AppColors.textDark)
+                                            .foregroundColor(textColor)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(
-                                                selectedTrigger == trigger ? 
-                                                AppColors.primary : 
-                                                AppColors.background
-                                            )
+                                            .background(backgroundColor)
                                             .cornerRadius(20)
                                     }
                                     .accessibilityLabel("\(trigger) trigger")
@@ -110,14 +110,16 @@ struct QuickRejectionModalCommon: View {
                                     selectedMood = mood
                                     HapticFeedback.light()
                                 }) {
+                                    let isSelected = selectedMood == mood
+                                    let moodIconColor = isSelected ? Color.white : moodColor(for: mood)
+                                    let moodBackgroundColor = isSelected ? moodColor(for: mood) : Color.white
+                                    
                                     VStack(spacing: 6) {
                                         Image(systemName: moodIcon(for: mood))
                                             .font(.system(size: 20))
-                                            .foregroundColor(selectedMood == mood ? .white : moodColor(for: mood))
+                                            .foregroundColor(moodIconColor)
                                             .frame(width: 40, height: 40)
-                                            .background(
-                                                selectedMood == mood ? moodColor(for: mood) : Color.white
-                                            )
+                                            .background(moodBackgroundColor)
                                             .cornerRadius(20)
                                             .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                                         
@@ -153,7 +155,7 @@ struct QuickRejectionModalCommon: View {
                             isPresented = false
                         }) {
                             Text("Cancel")
-                                .font(AppTextStyles.button)
+                                .font(AppTextStyles.buttonFont)
                                 .foregroundColor(AppColors.textDark)
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -165,7 +167,7 @@ struct QuickRejectionModalCommon: View {
                             saveRejection()
                         }) {
                             Text("Save")
-                                .font(AppTextStyles.button)
+                                .font(AppTextStyles.buttonFont)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()

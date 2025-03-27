@@ -2,12 +2,17 @@ import SwiftUI
 import Charts // Import Charts framework for visualizations
 import UIKit  // Import UIKit for feedback generators
 import CoreData
+// Import the Theme file for styling
+import "../../../Utilities/Theme"
+// Remove these imports
+@_exported import struct Digitalrejection.ResilientMe.Utilities.AppColors
+@_exported import struct Digitalrejection.ResilientMe.Utilities.AppTextStyles
 
 // MARK: - Local Style Definitions 
-// Custom style definitions for this view only (renamed to avoid conflicts)
+// These are custom for this view only (renamed to avoid conflicts)
 
-// Colors definitions for use in this view only
-private struct MoodViewColors {
+// App Colors definitions for use in this view only
+private struct MoodColors {
     // Primary application colors
     static let primary = Color("AppPrimary") // Blue
     static let secondary = Color(hex: "94B49F") // Sage green
@@ -31,7 +36,7 @@ private struct MoodViewColors {
 }
 
 // Text style definitions for use in this view only
-private struct MoodViewTextStyles {
+private struct MoodTextStyles {
     static let h1 = Font.system(size: 28, weight: .bold)
     static let h2 = Font.system(size: 24, weight: .bold)
     static let h3 = Font.system(size: 20, weight: .semibold)
@@ -82,41 +87,6 @@ extension View {
 
 // MARK: - Extensions and Utility Types
 
-// Class to handle follow-up mood check notifications
-private class FollowUpMoodObserver {
-    private var observer: Any?
-    
-    func setupObserver() {
-        observer = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("followUpMoodCheck"),
-            object: nil,
-            queue: .main
-        ) { notification in
-            if let userInfo = notification.userInfo,
-               let originalMood = userInfo["originalMood"] as? String,
-               let originalIntensity = userInfo["originalIntensity"] as? Int {
-                
-                // Post a new notification to handle state updates
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("updateFollowUpMoodCheckState"),
-                    object: nil,
-                    userInfo: [
-                        "showFollowUpMoodCheck": true,
-                        "followUpOriginalMood": originalMood,
-                        "followUpOriginalIntensity": originalIntensity
-                    ]
-                )
-            }
-        }
-    }
-    
-    deinit {
-        if let observer = observer {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
-}
-
 // Renamed to avoid ambiguity with the MoodEntry in AppTypes
 struct MoodTrackerEntry: Identifiable, Hashable {
     let id: String
@@ -159,29 +129,10 @@ struct MoodView: View {
     @State private var showingJournalPrompt: Bool = false
     @State private var currentJournalPromptEntry: MoodData? = nil
     @State private var showingCopingStrategies: Bool = false
-    @State private var selectedCopingStrategy: String?
-    @State private var showingCharts: Bool = false
-    @State private var journalPrompt: String = ""
-    
-    // New state variables for automatic suggestion features
-    @State private var previousMood: String?
-    @State private var previousIntensity: Int = 0
-    @State private var showingAutoSuggestedStrategies: Bool = false
-    @State private var showFollowUpMoodPrompt: Bool = false
-    
-    // Follow-up related state variables
-    @State private var showFollowUpMoodCheck: Bool = false
-    @State private var followUpOriginalMood: String = ""
-    @State private var followUpOriginalIntensity: Int = 0
-    
-    // Strategy recommendation
-    @State private var suggestedStrategy: LocalCopingStrategyDetail? = nil
-    @State private var showingStrategyRecommendation: Bool = false
+    @State private var recommendedStrategies: [String] = []
     
     // UI feedback
     @State private var showSavedConfirmation: Bool = false
-    @State private var showFeedbackMessage: Bool = false
-    @State private var feedbackMessage: String = ""
     
     // Properties to store initial values
     private var initialMood: String
@@ -190,10 +141,8 @@ struct MoodView: View {
     // Properties for coping strategies and journal prompts
     @State private var recentMoods: [String] = []
     @State private var copingStrategies: [String] = []
-    @State private var recommendedStrategies: [String] = []
-    
-    // Observer for follow-up mood checks
-    private let followUpObserver = FollowUpMoodObserver()
+    @State private var selectedCopingStrategy: String? = nil
+    @State private var journalPrompt: String = ""
     
     // Time frames for chart filtering
     enum TimeFrame: String, CaseIterable, Identifiable {
@@ -214,97 +163,52 @@ struct MoodView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Main content
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header with app title and icon buttons
-                        headerView
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: AppLayout.spacing * 1.5) {
+                    // Header with app title and icon buttons
+                    headerView
+                    
+                    // Empathetic messaging
+                    if !showingHistory && !showingInsights {
+                        supportiveMessageView
                         
-                        // Empathetic messaging
-                        if !showingHistory && !showingInsights {
-                            supportiveMessageView
+                        // Mood entry form
+                        moodSelectionView
+                        
+                        // Intensity slider (only if mood is selected)
+                        if selectedMood != nil {
+                            intensitySliderView
+                            rejectionRelatedView
+                            noteEntryView
                             
-                            // Mood entry form
-                            moodSelectionView
-                            
-                            // Intensity slider (only if mood is selected)
-                            if selectedMood != nil {
-                                intensitySliderView
-                                rejectionRelatedView
-                                noteEntryView
-                                
-                                // Quick access to coping strategies
-                                if isRejectionRelated {
-                                    copingStrategiesButtonView
-                                }
-                                
-                                // Save button
-                                saveButtonView
+                            // Quick access to coping strategies
+                            if isRejectionRelated {
+                                copingStrategiesButtonView
                             }
-                        }
-                        
-                        // HISTORY VIEW
-                        if showingHistory {
-                            historyView
-                        }
-                        
-                        // INSIGHTS VIEW
-                        if showingInsights {
-                            insightsView
+                            
+                            // Save button
+                            saveButtonView
                         }
                     }
-                    .padding(.bottom, 100) // Extra padding for bottom buttons
-                }
-                .overlay(
-                    // Saved confirmation toast
-                    savedConfirmationToast
-                        .opacity(showSavedConfirmation ? 1 : 0)
-                        .animation(.easeInOut, value: showSavedConfirmation)
-                )
-                .overlay(
-                    // Feedback message toast
-                    feedbackMessageToast
-                        .opacity(showFeedbackMessage ? 1 : 0)
-                        .animation(.easeInOut, value: showFeedbackMessage)
-                )
-                
-                // Show auto-suggested strategies overlay when applicable
-                if showingAutoSuggestedStrategies {
-                    VStack {
-                        Spacer()
-                        autoSuggestedStrategiesView
-                            .padding(.horizontal)
-                            .transition(.move(edge: .bottom))
+                    
+                    // HISTORY VIEW
+                    if showingHistory {
+                        historyView
                     }
-                    .zIndex(2)
-                    .transition(.opacity)
-                    .animation(.easeInOut, value: showingAutoSuggestedStrategies)
-                    .background(
-                        Color.black.opacity(0.4)
-                            .edgesIgnoringSafeArea(.all)
-                            .onTapGesture {
-                                // Allow tapping outside to dismiss only if not showing follow-up
-                                if !showFollowUpMoodPrompt {
-                                    showingAutoSuggestedStrategies = false
-                                    
-                                    // Reset mood form completely when dismissed
-                                    selectedMood = nil
-                                    moodIntensity = initialIntensity
-                                    
-                                    // Show saved confirmation
-                                    showSavedConfirmation = true
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                        withAnimation {
-                                            showSavedConfirmation = false
-                                        }
-                                    }
-                                }
-                            }
-                    )
+                    
+                    // INSIGHTS VIEW
+                    if showingInsights {
+                        insightsView
+                    }
                 }
+                .padding(.horizontal)
+                .animation(.easeInOut(duration: 0.3), value: selectedMood != nil)
+                .animation(.easeInOut(duration: 0.3), value: showingHistory)
+                .animation(.easeInOut(duration: 0.3), value: showingInsights)
+                .animation(.easeInOut(duration: 0.3), value: isRejectionRelated)
             }
+            .background(AppColors.background)
             .navigationTitle("Mood Tracker")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -344,6 +248,22 @@ struct MoodView: View {
             .sheet(isPresented: $showingCopingStrategies) {
                 copingStrategiesView
             }
+            // Success toast notification
+            .overlay {
+                if showSavedConfirmation {
+                    VStack {
+                        Spacer()
+                        Text("Mood saved successfully")
+                            .font(AppTextStyles.body2)
+                            .foregroundColor(.white)
+                .padding()
+                            .background(AppColors.primary)
+                            .cornerRadius(AppLayout.cornerRadius)
+                            .padding(.bottom, 16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+            }
             .onAppear {
                 // Init recent moods
                 recentMoods = moodStore.recentMoods
@@ -351,37 +271,12 @@ struct MoodView: View {
                 // Reset form
                 resetForm()
                 
-                // Set up notification observer for follow-up prompts
-                setupFollowUpObserver()
-                
-                // Add observer for state updates from notifications
-                NotificationCenter.default.addObserver(
-                    forName: NSNotification.Name("updateFollowUpMoodCheckState"),
-                    object: nil,
-                    queue: .main
-                ) { note in
-                    if let userInfo = note.userInfo,
-                       let showCheck = userInfo["showFollowUpMoodCheck"] as? Bool,
-                       let originalMood = userInfo["followUpOriginalMood"] as? String,
-                       let originalIntensity = userInfo["followUpOriginalIntensity"] as? Int {
-                        withAnimation {
-                            showFollowUpMoodCheck = showCheck
-                            followUpOriginalMood = originalMood
-                            followUpOriginalIntensity = originalIntensity
-                        }
-                    }
-                }
-                
                 // If we have a starting mood from a deep link or notification
                 if !initialMood.isEmpty {
                     selectedMood = initialMood
                     updateCopingStrategies()
                     updateJournalPrompt()
                 }
-            }
-            .onDisappear {
-                // Remove the observer when view disappears
-                NotificationCenter.default.removeObserver(self, name: NSNotification.Name("updateFollowUpMoodCheckState"), object: nil)
             }
             .onChange(of: selectedMood) { newMood in
                 if let mood = newMood, !mood.isEmpty {
@@ -398,8 +293,8 @@ struct MoodView: View {
     private var headerView: some View {
         HStack {
             Text("How are you feeling?")
-                .font(MoodViewTextStyles.h2)
-                .foregroundColor(MoodViewColors.textDark)
+                .font(AppTextStyles.h2)
+                .foregroundColor(AppColors.textDark)
                 .accessibilityAddTraits(.isHeader)
             
             Spacer()
@@ -410,8 +305,8 @@ struct MoodView: View {
     // Supportive message view
     private var supportiveMessageView: some View {
                             Text("Your feelings matter. Track them here in a safe space.")
-                                .font(MoodViewTextStyles.body2)
-                                .foregroundColor(MoodViewColors.textMedium)
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(AppColors.textMedium)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
                                 .accessibilityLabel("Supportive message about tracking your feelings")
@@ -421,15 +316,15 @@ struct MoodView: View {
     private var moodSelectionView: some View {
                         VStack(alignment: .leading, spacing: AppLayout.spacing) {
             Text("Select your current mood")
-                                .font(MoodViewTextStyles.h3)
-                                .foregroundColor(MoodViewColors.textDark)
+                                .font(AppTextStyles.h3)
+                                .foregroundColor(AppColors.textDark)
                             
             // Recent moods section
             if !moodStore.recentMoods.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recent moods")
-                        .font(MoodViewTextStyles.body3)
-                        .foregroundColor(MoodViewColors.textMedium)
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textMedium)
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -440,14 +335,14 @@ struct MoodView: View {
                                     AppHapticFeedback.selection()
                                 }) {
                                     Text(mood)
-                                        .font(MoodViewTextStyles.body3)
-                                        .foregroundColor(selectedMood == mood ? .white : MoodViewColors.textDark)
+                                        .font(AppTextStyles.body3)
+                                        .foregroundColor(selectedMood == mood ? .white : AppColors.textDark)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
                                         .background(
                                             selectedMood == mood ? 
-                                            MoodViewColors.primary : 
-                                            MoodViewColors.background
+                                            AppColors.primary : 
+                                            AppColors.background
                                         )
                                         .cornerRadius(20)
                                 }
@@ -461,8 +356,8 @@ struct MoodView: View {
             // Positive moods
             VStack(alignment: .leading, spacing: 8) {
                 Text("Positive")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                 
                 moodCategoryGrid(moods: PredefinedMoods.positive)
             }
@@ -471,8 +366,8 @@ struct MoodView: View {
             // Negative moods
             VStack(alignment: .leading, spacing: 8) {
                 Text("Negative")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                 
                 moodCategoryGrid(moods: PredefinedMoods.negative)
             }
@@ -481,8 +376,8 @@ struct MoodView: View {
             // Neutral moods
             VStack(alignment: .leading, spacing: 8) {
                 Text("Neutral")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                 
                 moodCategoryGrid(moods: PredefinedMoods.neutral)
             }
@@ -500,19 +395,19 @@ struct MoodView: View {
                     Image(systemName: "plus.circle")
                     Text("Custom mood")
                 }
-                .font(MoodViewTextStyles.body3)
-                .foregroundColor(MoodViewColors.primary)
+                .font(AppTextStyles.body3)
+                .foregroundColor(AppColors.primary)
             }
             
             if showingCustomMoodField {
                 TextField("Enter your mood", text: $customMood)
-                    .font(MoodViewTextStyles.body2)
+                    .font(AppTextStyles.body2)
                     .padding()
-                    .background(MoodViewColors.background)
+                    .background(AppColors.background)
                     .cornerRadius(AppLayout.cornerRadius / 2)
                     .overlay(
                         RoundedRectangle(cornerRadius: AppLayout.cornerRadius / 2)
-                            .stroke(MoodViewColors.textLight.opacity(0.3), lineWidth: 1)
+                            .stroke(AppColors.textLight.opacity(0.3), lineWidth: 1)
                     )
                 
                 Button(action: {
@@ -520,18 +415,18 @@ struct MoodView: View {
                     AppHapticFeedback.selection()
                 }) {
                     Text("Use this mood")
-                        .font(MoodViewTextStyles.body3)
+                        .font(AppTextStyles.body3)
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(customMood.isEmpty ? MoodViewColors.textLight : MoodViewColors.primary)
+                        .background(customMood.isEmpty ? AppColors.textLight : AppColors.primary)
                         .cornerRadius(20)
                 }
                 .disabled(customMood.isEmpty)
             }
                         }
                         .padding()
-                        .background(MoodViewColors.cardBackground)
+                        .background(AppColors.cardBackground)
                         .cornerRadius(AppLayout.cornerRadius)
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
                             .accessibilityElement(children: .combine)
@@ -549,15 +444,15 @@ struct MoodView: View {
                     AppHapticFeedback.selection()
                 }) {
                     Text(mood)
-                        .font(MoodViewTextStyles.body3)
-                        .foregroundColor(selectedMood == mood ? .white : MoodViewColors.textDark)
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(selectedMood == mood ? .white : AppColors.textDark)
                         .frame(minWidth: 80)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(
                             selectedMood == mood ? 
-                            MoodViewColors.primary : 
-                            MoodViewColors.background
+                            AppColors.primary : 
+                            AppColors.background
                         )
                         .cornerRadius(20)
                 }
@@ -568,62 +463,58 @@ struct MoodView: View {
     
     // Intensity slider view
     private var intensitySliderView: some View {
-        VStack(alignment: .leading, spacing: AppLayout.spacing) {
-            Text("How intense is this feeling?")
-                .font(MoodViewTextStyles.h3)
-                .foregroundColor(MoodViewColors.textDark)
-            
-            VStack {
-                Slider(value: Binding(
-                    get: { Double(moodIntensity) },
-                    set: { moodIntensity = Int(round($0)) }
-                ), in: 1...10, step: 1)
-                .accentColor(MoodViewColors.primary)
-                .onChange(of: moodIntensity) { _ in
-                    // Force UI update when intensity changes
-                    AppHapticFeedback.light()
-                }
-                
-                HStack {
-                    Text("1")
-                        .font(MoodViewTextStyles.body3)
-                        .foregroundColor(MoodViewColors.textLight)
-                    
-                    Spacer()
-                    
-                    Text("\(moodIntensity)")
-                        .font(MoodViewTextStyles.body3.bold())
-                        .foregroundColor(MoodViewColors.primary)
-                    
-                    Spacer()
-                    
-                    Text("10")
-                        .font(MoodViewTextStyles.body3)
-                        .foregroundColor(MoodViewColors.textLight)
-                }
-            }
-        }
-        .padding()
-        .background(MoodViewColors.cardBackground)
-        .cornerRadius(AppLayout.cornerRadius)
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
-        .accessibilityCard(label: "Mood intensity", hint: "Select how strongly you feel this emotion from 1 to 10")
+                            VStack(alignment: .leading, spacing: AppLayout.spacing) {
+                                Text("How intense is this feeling?")
+                                    .font(AppTextStyles.h3)
+                                    .foregroundColor(AppColors.textDark)
+                                
+                                VStack {
+                                    Slider(value: Binding(
+                                        get: { Double(moodIntensity) },
+                                        set: { moodIntensity = Int($0) }
+                                    ), in: 1...5, step: 1)
+                                    .accentColor(AppColors.primary)
+                                    
+                                    HStack {
+                                        Text("Mild")
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textLight)
+                                        
+                                        Spacer()
+                                        
+                                        Text("Moderate")
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textLight)
+                                        
+                                        Spacer()
+                                        
+                                        Text("Strong")
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textLight)
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(AppColors.cardBackground)
+                            .cornerRadius(AppLayout.cornerRadius)
+                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
+                                .accessibilityCard(label: "Mood intensity", hint: "Select how strongly you feel this emotion from 1 to 5")
     }
-    
+                                
     // Rejection related view
     private var rejectionRelatedView: some View {
                                 VStack(alignment: .leading, spacing: AppLayout.spacing) {
                                     Toggle(isOn: $isRejectionRelated) {
                 Text("Is this related to a rejection experience?")
-                                            .font(MoodViewTextStyles.h3)
-                                            .foregroundColor(MoodViewColors.textDark)
+                                            .font(AppTextStyles.h3)
+                                            .foregroundColor(AppColors.textDark)
                                     }
-                                    .toggleStyle(SwitchToggleStyle(tint: MoodViewColors.primary))
+                                    .toggleStyle(SwitchToggleStyle(tint: AppColors.primary))
                                     
                                     if isRejectionRelated {
                                         Text("What triggered this feeling?")
-                                            .font(MoodViewTextStyles.body2)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                                            .font(AppTextStyles.body2)
+                                            .foregroundColor(AppColors.textMedium)
                                             .padding(.top, 8)
                                         
                 // Social triggers
@@ -648,13 +539,13 @@ struct MoodView: View {
                 if !RejectionTriggers.all.contains(rejectionTrigger) && !rejectionTrigger.isEmpty {
                     HStack {
                         Text("Other:")
-                            .font(MoodViewTextStyles.body3)
-                            .foregroundColor(MoodViewColors.textMedium)
+                            .font(AppTextStyles.body3)
+                            .foregroundColor(AppColors.textMedium)
                         
                         TextField("Describe the trigger", text: $rejectionTrigger)
-                            .font(MoodViewTextStyles.body3)
+                            .font(AppTextStyles.body3)
                             .padding(8)
-                            .background(MoodViewColors.background)
+                            .background(AppColors.background)
                             .cornerRadius(AppLayout.cornerRadius / 2)
                     }
                 }
@@ -667,14 +558,14 @@ struct MoodView: View {
                         Image(systemName: "plus.circle")
                         Text("Add custom trigger")
                     }
-                                                            .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.primary)
+                                                            .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.primary)
                 }
                 .padding(.top, 8)
             }
         }
                                                 .padding()
-        .background(MoodViewColors.cardBackground)
+        .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         .animation(.easeInOut, value: isRejectionRelated)
@@ -685,8 +576,8 @@ struct MoodView: View {
     private func rejectionTriggerCategoryView(categoryName: String, triggers: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(categoryName)
-                .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textMedium)
                                         
                                         ScrollView(.horizontal, showsIndicators: false) {
                                             HStack(spacing: 10) {
@@ -696,14 +587,14 @@ struct MoodView: View {
                             AppHapticFeedback.selection()
                                                     }) {
                             Text(trigger)
-                                                            .font(MoodViewTextStyles.body3)
-                                .foregroundColor(rejectionTrigger == trigger ? .white : MoodViewColors.textDark)
+                                                            .font(AppTextStyles.body3)
+                                .foregroundColor(rejectionTrigger == trigger ? .white : AppColors.textDark)
                                                             .padding(.horizontal, 12)
                                                             .padding(.vertical, 8)
                                                             .background(
                                     rejectionTrigger == trigger ? 
-                                    MoodViewColors.primary : 
-                                                                MoodViewColors.background
+                                    AppColors.primary : 
+                                                                AppColors.background
                                                             )
                                                             .cornerRadius(20)
                                                     }
@@ -718,26 +609,26 @@ struct MoodView: View {
     private var noteEntryView: some View {
                             VStack(alignment: .leading, spacing: AppLayout.spacing) {
                                 Text("Add a note (optional)")
-                                    .font(MoodViewTextStyles.h3)
-                                    .foregroundColor(MoodViewColors.textDark)
+                                    .font(AppTextStyles.h3)
+                                    .foregroundColor(AppColors.textDark)
                                 
                                 TextEditor(text: $moodNote)
                                     .frame(height: 100)
                                     .padding(8)
-                                    .background(MoodViewColors.background)
+                                    .background(AppColors.background)
                                     .cornerRadius(AppLayout.cornerRadius / 2)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: AppLayout.cornerRadius / 2)
-                                                .stroke(MoodViewColors.textLight.opacity(0.3), lineWidth: 1)
+                                                .stroke(AppColors.textLight.opacity(0.3), lineWidth: 1)
                                         )
                                     
                                     // Supportive message
                                     Text("Express yourself freely. This is your private space.")
-                                        .font(MoodViewTextStyles.caption)
-                                        .foregroundColor(MoodViewColors.textLight)
+                                        .font(AppTextStyles.caption)
+                                        .foregroundColor(AppColors.textLight)
         }
         .padding()
-        .background(MoodViewColors.cardBackground)
+        .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         .accessibilityCard(label: "Note section", hint: "Add optional notes about your feelings")
@@ -772,7 +663,7 @@ struct MoodView: View {
             }
                                         .padding()
                                         .foregroundColor(.white)
-            .background(MoodViewColors.secondary)
+            .background(AppColors.secondary)
                                         .cornerRadius(AppLayout.cornerRadius)
                                     }
         .padding(.horizontal)
@@ -808,8 +699,8 @@ struct MoodView: View {
     private var copingStrategiesHeader: some View {
         HStack {
             Text("Recommended Coping Strategies")
-                .font(MoodViewTextStyles.h4)
-                .foregroundColor(MoodViewColors.textDark)
+                .font(AppTextStyles.h4)
+                .foregroundColor(AppColors.textDark)
             
             Spacer()
             
@@ -821,10 +712,10 @@ struct MoodView: View {
                     Text("AI")
                         .font(.system(size: 10, weight: .medium))
                 }
-                .foregroundColor(MoodViewColors.textLight)
+                .foregroundColor(AppColors.textLight)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(MoodViewColors.textLight.opacity(0.2))
+                .background(AppColors.textLight.opacity(0.2))
                 .cornerRadius(12)
             }
         }
@@ -835,8 +726,8 @@ struct MoodView: View {
         Group {
             if copingStrategies.isEmpty {
                 Text("Select a mood to see personalized coping strategies.")
-                    .font(MoodViewTextStyles.body1)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body1)
+                    .foregroundColor(AppColors.textMedium)
                     .padding(.vertical, 8)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -855,8 +746,8 @@ struct MoodView: View {
     private func copingStrategyCard(_ strategy: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(strategy)
-                .font(MoodViewTextStyles.body1)
-                .foregroundColor(MoodViewColors.textDark)
+                .font(AppTextStyles.body1)
+                .foregroundColor(AppColors.textDark)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
             
@@ -867,19 +758,19 @@ struct MoodView: View {
                 AppHapticFeedback.selection()
             }) {
                 Text("Try This")
-                    .font(MoodViewTextStyles.caption)
-                    .foregroundColor(MoodViewColors.primary)
+                    .font(AppTextStyles.caption)
+                    .foregroundColor(AppColors.primary)
             }
         }
         .frame(width: 200, height: 120)
         .padding()
         .background(
             RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                .fill(MoodViewColors.cardBackground)
+                .fill(AppColors.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                .stroke(selectedCopingStrategy == strategy ? MoodViewColors.primary : Color.clear, lineWidth: 2)
+                .stroke(selectedCopingStrategy == strategy ? AppColors.primary : Color.clear, lineWidth: 2)
         )
     }
     
@@ -889,11 +780,11 @@ struct MoodView: View {
             if let selectedMood = selectedMood, !selectedMood.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(journalPrompt)
-                        .font(MoodViewTextStyles.body1)
-                        .foregroundColor(MoodViewColors.textDark)
+                        .font(AppTextStyles.body1)
+                        .foregroundColor(AppColors.textDark)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding()
-                        .background(MoodViewColors.cardBackground)
+                        .background(AppColors.cardBackground)
                         .cornerRadius(AppLayout.cornerRadius)
                     
                     // Journal button
@@ -910,8 +801,8 @@ struct MoodView: View {
                             Image(systemName: "square.and.pencil")
                             Text("Journal with this prompt")
                         }
-                        .font(MoodViewTextStyles.button)
-                        .foregroundColor(MoodViewColors.primary)
+                        .font(AppTextStyles.button)
+                        .foregroundColor(AppColors.primary)
                         .padding(.top, 4)
                     }
                 }
@@ -924,8 +815,8 @@ struct MoodView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Reflective Prompt")
-                    .font(MoodViewTextStyles.h4)
-                    .foregroundColor(MoodViewColors.textDark)
+                    .font(AppTextStyles.h4)
+                    .foregroundColor(AppColors.textDark)
                 
                 Spacer()
                 
@@ -937,26 +828,26 @@ struct MoodView: View {
                         Text("AI")
                             .font(.system(size: 10, weight: .medium))
                     }
-                    .foregroundColor(MoodViewColors.textLight)
+                    .foregroundColor(AppColors.textLight)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(MoodViewColors.textLight.opacity(0.2))
+                    .background(AppColors.textLight.opacity(0.2))
                     .cornerRadius(12)
                 }
             }
             
             if let mood = selectedMood, mood.isEmpty {
                 Text("Select a mood to see a personalized journal prompt.")
-                    .font(MoodViewTextStyles.body1)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body1)
+                    .foregroundColor(AppColors.textMedium)
                     .padding(.vertical, 8)
             } else {
                 Text(journalPrompt)
-                    .font(MoodViewTextStyles.body1)
-                    .foregroundColor(MoodViewColors.textDark)
+                    .font(AppTextStyles.body1)
+                    .foregroundColor(AppColors.textDark)
                     .fixedSize(horizontal: false, vertical: true)
                                 .padding()
-                                .background(MoodViewColors.cardBackground)
+                                .background(AppColors.cardBackground)
                                 .cornerRadius(AppLayout.cornerRadius)
             }
             
@@ -974,8 +865,8 @@ struct MoodView: View {
                         Image(systemName: "square.and.pencil")
                         Text("Journal with this prompt")
                     }
-                    .font(MoodViewTextStyles.button)
-                    .foregroundColor(MoodViewColors.primary)
+                    .font(AppTextStyles.button)
+                    .foregroundColor(AppColors.primary)
                     .padding(.top, 4)
                 }
             }
@@ -988,8 +879,8 @@ struct MoodView: View {
                             VStack(alignment: .leading, spacing: AppLayout.spacing) {
                                 HStack {
                                     Text("Your Mood History")
-                                        .font(MoodViewTextStyles.h3)
-                                        .foregroundColor(MoodViewColors.textDark)
+                                        .font(AppTextStyles.h3)
+                                        .foregroundColor(AppColors.textDark)
                                     
                                     Spacer()
                                     
@@ -997,13 +888,13 @@ struct MoodView: View {
                                         showingHistory = false
                                     }) {
                                         Text("Close")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.primary)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.primary)
                                     }
                                 }
                                 
                                 Divider()
-                                    .background(MoodViewColors.textLight.opacity(0.3))
+                                    .background(AppColors.textLight.opacity(0.3))
                                 
             // Time frame selection
             Picker("Time Frame", selection: $selectedTimeFrame) {
@@ -1034,7 +925,7 @@ struct MoodView: View {
             }
         }
         .padding()
-        .background(MoodViewColors.cardBackground)
+        .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         .accessibilityCard(label: "Mood history", hint: "View your past mood entries")
@@ -1045,15 +936,15 @@ struct MoodView: View {
                                     VStack(spacing: 16) {
                                         Image(systemName: "calendar.badge.clock")
                                             .font(.system(size: 40))
-                                            .foregroundColor(MoodViewColors.textLight)
+                                            .foregroundColor(AppColors.textLight)
                                         
                                         Text("No mood entries yet")
-                                            .font(MoodViewTextStyles.h4)
-                                            .foregroundColor(MoodViewColors.textDark)
+                                            .font(AppTextStyles.h4)
+                                            .foregroundColor(AppColors.textDark)
                                         
                                         Text("Start tracking your moods to see your history here")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textMedium)
                                             .multilineTextAlignment(.center)
                                     }
                                     .frame(maxWidth: .infinity)
@@ -1065,26 +956,26 @@ struct MoodView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(entry.mood)
-                    .font(MoodViewTextStyles.h4)
+                    .font(AppTextStyles.h4)
                     .foregroundColor(colorForMood(entry.mood))
                 
                 Spacer()
                 
                 Text(formattedDate(entry.date))
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
             }
             
             HStack {
                 Text("Intensity:")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                 
                 // Intensity indicator
                 HStack(spacing: 2) {
                     ForEach(1...5, id: \.self) { i in
                         Circle()
-                            .fill(i <= entry.intensity ? colorForMood(entry.mood) : MoodViewColors.textLight.opacity(0.3))
+                            .fill(i <= entry.intensity ? colorForMood(entry.mood) : AppColors.textLight.opacity(0.3))
                             .frame(width: 8, height: 8)
                     }
                 }
@@ -1093,19 +984,19 @@ struct MoodView: View {
                 
                 if entry.rejectionTrigger != nil {
                     Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(MoodViewColors.warning)
+                        .foregroundColor(AppColors.warning)
                         .font(.system(size: 14))
                     
                     Text("Rejection")
-                        .font(MoodViewTextStyles.caption)
-                        .foregroundColor(MoodViewColors.warning)
+                        .font(AppTextStyles.caption)
+                        .foregroundColor(AppColors.warning)
                 }
             }
             
             if let note = entry.note, !note.isEmpty {
                 Text(note)
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textDark)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textDark)
                     .lineLimit(3)
                     .padding(.top, 4)
             }
@@ -1113,12 +1004,12 @@ struct MoodView: View {
             if let trigger = entry.rejectionTrigger {
                 HStack {
                     Text("Trigger:")
-                        .font(MoodViewTextStyles.caption)
-                        .foregroundColor(MoodViewColors.textMedium)
+                        .font(AppTextStyles.caption)
+                        .foregroundColor(AppColors.textMedium)
                     
                     Text(trigger)
-                        .font(MoodViewTextStyles.caption)
-                        .foregroundColor(MoodViewColors.textDark)
+                        .font(AppTextStyles.caption)
+                        .foregroundColor(AppColors.textDark)
                 }
                 .padding(.top, 2)
             }
@@ -1126,18 +1017,18 @@ struct MoodView: View {
             if let strategy = entry.copingStrategy {
                 HStack {
                     Text("Coping:")
-                        .font(MoodViewTextStyles.caption)
-                        .foregroundColor(MoodViewColors.textMedium)
+                        .font(AppTextStyles.caption)
+                        .foregroundColor(AppColors.textMedium)
                     
                     Text(strategy)
-                        .font(MoodViewTextStyles.caption)
-                        .foregroundColor(MoodViewColors.textDark)
+                        .font(AppTextStyles.caption)
+                        .foregroundColor(AppColors.textDark)
                 }
                 .padding(.top, 2)
                                 }
                             }
                             .padding()
-        .background(MoodViewColors.background)
+        .background(AppColors.background)
         .cornerRadius(AppLayout.cornerRadius / 2)
         .padding(.vertical, 4)
     }
@@ -1147,8 +1038,8 @@ struct MoodView: View {
                             VStack(alignment: .leading, spacing: AppLayout.spacing) {
                                 HStack {
                                     Text("Mood Insights")
-                                    .font(MoodViewTextStyles.h3)
-                                    .foregroundColor(MoodViewColors.textDark)
+                                    .font(AppTextStyles.h3)
+                                    .foregroundColor(AppColors.textDark)
                                 
                                     Spacer()
                                     
@@ -1156,8 +1047,8 @@ struct MoodView: View {
                                         showingInsights = false
                                     }) {
                                         Text("Close")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.primary)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.primary)
                                     }
                                 }
                                 
@@ -1183,7 +1074,7 @@ struct MoodView: View {
             averageMoodIntensityView
         }
         .padding()
-        .background(MoodViewColors.cardBackground)
+        .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         .accessibilityCard(label: "Mood insights", hint: "View analytics about your mood patterns")
@@ -1193,26 +1084,26 @@ struct MoodView: View {
     private var moodDistributionView: some View {
                                 VStack(alignment: .leading, spacing: 8) {
             Text("Mood Distribution")
-                                        .font(MoodViewTextStyles.h4)
-                                        .foregroundColor(MoodViewColors.textDark)
+                                        .font(AppTextStyles.h4)
+                                        .foregroundColor(AppColors.textDark)
                                     
             let distribution = moodStore.getMoodDistribution(timeframe: selectedTimeFrame)
             
             if distribution.isEmpty {
                 Text("No data for this time period")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(MoodViewColors.background)
+                    .background(AppColors.background)
                     .cornerRadius(AppLayout.cornerRadius / 2)
             } else {
                 VStack(spacing: 12) {
                     ForEach(distribution.sorted(by: { $0.value > $1.value }), id: \.key) { category, count in
                         HStack {
                             Text(category)
-                                .font(MoodViewTextStyles.body2)
-                                .foregroundColor(MoodViewColors.textDark)
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(AppColors.textDark)
                             
                             Spacer()
                             
@@ -1223,7 +1114,7 @@ struct MoodView: View {
                                 
                                 ZStack(alignment: .leading) {
                                     Rectangle()
-                                        .fill(MoodViewColors.textLight.opacity(0.2))
+                                        .fill(AppColors.textLight.opacity(0.2))
                                         .frame(width: geometry.size.width, height: 10)
                                         .cornerRadius(5)
                                     
@@ -1237,12 +1128,12 @@ struct MoodView: View {
                             .frame(width: 100)
                             
                             Text("\(count)")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textMedium)
                                 .frame(width: 30, alignment: .trailing)
                         }
                         .padding()
-                                            .background(MoodViewColors.background)
+                                            .background(AppColors.background)
                                             .cornerRadius(AppLayout.cornerRadius / 2)
                     }
                 }
@@ -1255,35 +1146,35 @@ struct MoodView: View {
     private var rejectionTriggersView: some View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Common Rejection Triggers")
-                                        .font(MoodViewTextStyles.h4)
-                                        .foregroundColor(MoodViewColors.textDark)
+                                        .font(AppTextStyles.h4)
+                                        .foregroundColor(AppColors.textDark)
                                     
             let triggerDistribution = moodStore.getRejectionTriggerDistribution(timeframe: selectedTimeFrame)
                                     
             if triggerDistribution.isEmpty {
                                         Text("No rejection-related entries in this time period")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textMedium)
                                             .padding()
                                             .frame(maxWidth: .infinity)
-                                            .background(MoodViewColors.background)
+                                            .background(AppColors.background)
                                             .cornerRadius(AppLayout.cornerRadius / 2)
                                     } else {
                                         VStack(spacing: 12) {
                     ForEach(triggerDistribution.sorted(by: { $0.value > $1.value }).prefix(3), id: \.key) { category, count in
                                                 HStack {
                             Text(category)
-                                                        .font(MoodViewTextStyles.body2)
-                                                        .foregroundColor(MoodViewColors.textDark)
+                                                        .font(AppTextStyles.body2)
+                                                        .foregroundColor(AppColors.textDark)
                                                     
                                                     Spacer()
                                                     
                                                     Text("\(count) time\(count == 1 ? "" : "s")")
-                                                        .font(MoodViewTextStyles.body3)
-                                                        .foregroundColor(MoodViewColors.textMedium)
+                                                        .font(AppTextStyles.body3)
+                                                        .foregroundColor(AppColors.textMedium)
                                                 }
                                                 .padding()
-                                                .background(MoodViewColors.background)
+                                                .background(AppColors.background)
                                                 .cornerRadius(AppLayout.cornerRadius / 2)
                                             }
                                         }
@@ -1296,35 +1187,35 @@ struct MoodView: View {
     private var copingStrategiesEffectivenessView: some View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Effective Coping Strategies")
-                                        .font(MoodViewTextStyles.h4)
-                                        .foregroundColor(MoodViewColors.textDark)
+                                        .font(AppTextStyles.h4)
+                                        .foregroundColor(AppColors.textDark)
                                     
             let strategyCounts = moodStore.getEffectiveCopingStrategies(timeframe: selectedTimeFrame)
                                     
             if strategyCounts.isEmpty {
                                         Text("No coping strategies recorded in this time period")
-                                            .font(MoodViewTextStyles.body3)
-                                            .foregroundColor(MoodViewColors.textMedium)
+                                            .font(AppTextStyles.body3)
+                                            .foregroundColor(AppColors.textMedium)
                                             .padding()
                                             .frame(maxWidth: .infinity)
-                                            .background(MoodViewColors.background)
+                                            .background(AppColors.background)
                                             .cornerRadius(AppLayout.cornerRadius / 2)
                                     } else {
                                         VStack(spacing: 12) {
                                             ForEach(strategyCounts.sorted(by: { $0.value > $1.value }).prefix(3), id: \.key) { strategy, count in
                                                 HStack {
                                                     Text(strategy)
-                                                        .font(MoodViewTextStyles.body2)
-                                                        .foregroundColor(MoodViewColors.textDark)
+                                                        .font(AppTextStyles.body2)
+                                                        .foregroundColor(AppColors.textDark)
                                                     
                                                     Spacer()
                                                     
                                                     Text("\(count) time\(count == 1 ? "" : "s")")
-                                                        .font(MoodViewTextStyles.body3)
-                                                        .foregroundColor(MoodViewColors.textMedium)
+                                                        .font(AppTextStyles.body3)
+                                                        .foregroundColor(AppColors.textMedium)
                                                 }
                                                 .padding()
-                                                .background(MoodViewColors.background)
+                                                .background(AppColors.background)
                                                 .cornerRadius(AppLayout.cornerRadius / 2)
                                             }
                                         }
@@ -1337,18 +1228,18 @@ struct MoodView: View {
     private var averageMoodIntensityView: some View {
                                 VStack(alignment: .leading, spacing: 8) {
             Text("Average Mood Intensity")
-                                        .font(MoodViewTextStyles.h4)
-                                        .foregroundColor(MoodViewColors.textDark)
+                                        .font(AppTextStyles.h4)
+                                        .foregroundColor(AppColors.textDark)
                                     
             let average = moodStore.getAverageIntensity(timeframe: selectedTimeFrame)
                                     
             if average == 0 {
                 Text("No data for this time period")
-                    .font(MoodViewTextStyles.body3)
-                                        .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                                        .foregroundColor(AppColors.textMedium)
                                         .padding()
                     .frame(maxWidth: .infinity)
-                                        .background(MoodViewColors.background)
+                                        .background(AppColors.background)
                                         .cornerRadius(AppLayout.cornerRadius / 2)
             } else {
                 HStack(spacing: 20) {
@@ -1356,7 +1247,7 @@ struct MoodView: View {
                     ZStack {
                         Circle()
                             .stroke(
-                                MoodViewColors.textLight.opacity(0.2),
+                                AppColors.textLight.opacity(0.2),
                                 lineWidth: 10
                             )
                             .frame(width: 80, height: 80)
@@ -1364,7 +1255,7 @@ struct MoodView: View {
                         Circle()
                             .trim(from: 0, to: CGFloat(average) / 5.0)
                             .stroke(
-                                MoodViewColors.primary,
+                                AppColors.primary,
                                 style: StrokeStyle(
                                     lineWidth: 10,
                                     lineCap: .round
@@ -1374,23 +1265,23 @@ struct MoodView: View {
                             .rotationEffect(.degrees(-90))
                         
                         Text(String(format: "%.1f", average))
-                            .font(MoodViewTextStyles.h3)
-                    .foregroundColor(MoodViewColors.textDark)
+                            .font(AppTextStyles.h3)
+                    .foregroundColor(AppColors.textDark)
                     }
             
             VStack(alignment: .leading, spacing: 4) {
                         Text("Out of 5")
-                    .font(MoodViewTextStyles.body3)
-                    .foregroundColor(MoodViewColors.textMedium)
+                    .font(AppTextStyles.body3)
+                    .foregroundColor(AppColors.textMedium)
                         
                         // Interpretation
                         Text(intensityInterpretation(average))
-                    .font(MoodViewTextStyles.body3)
-                            .foregroundColor(MoodViewColors.textDark)
+                    .font(AppTextStyles.body3)
+                            .foregroundColor(AppColors.textDark)
                     }
                 }
                 .padding()
-                .background(MoodViewColors.background)
+                .background(AppColors.background)
                 .cornerRadius(AppLayout.cornerRadius / 2)
             }
         }
@@ -1403,11 +1294,11 @@ struct MoodView: View {
             saveMood()
         }) {
             Text("Save Mood")
-                .font(MoodViewTextStyles.h4)
+                .font(AppTextStyles.h4)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
         .padding()
-                .background(MoodViewColors.primary)
+                .background(AppColors.primary)
         .cornerRadius(AppLayout.cornerRadius)
         }
         .padding(.horizontal)
@@ -1423,10 +1314,6 @@ struct MoodView: View {
         guard let selectedMood = selectedMood else { return }
         
         let isCustomMood = !PredefinedMoods.all.contains(selectedMood)
-        
-        // Store the current mood data for follow-up comparison
-        previousMood = selectedMood
-        previousIntensity = moodIntensity
         
         let entry = MoodData(
             id: UUID().uuidString,
@@ -1446,27 +1333,33 @@ struct MoodView: View {
         
         moodStore.saveMoodEntry(entry: entry)
         
-        // Get coping strategies recommendation immediately
-        if moodIntensity > 3 || isRejectionRelated {
-            recommendedStrategies = CopingStrategies.recommendFor(
-                mood: selectedMood,
-                trigger: isRejectionRelated && !rejectionTrigger.isEmpty ? rejectionTrigger : nil
-            )
-            // Automatically show the suggested strategies
-            showingAutoSuggestedStrategies = true
-        }
-        
-        // Reset form but keep the selectedMood and intensity for potential follow-up
+        // Reset form
+        self.selectedMood = nil
         self.customMood = ""
         self.showingCustomMoodField = false
+        self.moodIntensity = initialIntensity
         self.moodNote = ""
         self.isRejectionRelated = false
         self.rejectionTrigger = ""
         self.copingStrategy = ""
         self.journalPrompt = ""
+        self.copingStrategies = []
+        self.selectedCopingStrategy = nil
         
-        // Provide haptic feedback for mood logging completion
+        // Show success toast
+        withAnimation {
+            showSavedConfirmation = true
+        }
+        
+        // Haptic feedback
         AppHapticFeedback.success()
+        
+        // Hide toast after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                showSavedConfirmation = false
+            }
+        }
     }
     
     // Format date for display
@@ -1493,7 +1386,7 @@ struct MoodView: View {
         case "Family":
             return Color.yellow
         default:
-            return MoodViewColors.primary
+            return AppColors.primary
         }
     }
     
@@ -1564,21 +1457,20 @@ struct MoodView: View {
         
         if isStrongReaction {
             // For strong reactions, get strategies from our library
-            let libraryStrategies = LocalCopingStrategiesLibrary.shared.recommendStrategies(
-                for: selectedMood ?? "",
+            let libraryStrategies = CopingStrategiesLibrary.shared.recommendStrategies(
+                for: selectedMood,
                 intensity: moodIntensity,
                 trigger: isRejectionRelated ? rejectionTrigger : nil
             )
             
             // Convert to simple string format for backward compatibility
-            copingStrategies = LocalCopingStrategiesLibrary.getSimpleStrategyStrings(from: libraryStrategies)
+            copingStrategies = CopingStrategiesLibrary.getSimpleStrategyStrings(from: libraryStrategies)
         } else {
             // For milder reactions, use AI-powered or fallback strategies
             copingStrategies = moodAnalysisEngine.getCopingStrategiesForMood(
-                mood: selectedMood ?? "", 
-                intensity: moodIntensity,
+                selectedMood, 
                 trigger: isRejectionRelated ? rejectionTrigger : nil
-            ) ?? []
+            )
         }
         
         // Clear any previously selected strategy
@@ -1594,9 +1486,9 @@ struct MoodView: View {
         
         // Use AI-powered journal prompt
         journalPrompt = moodAnalysisEngine.getJournalPromptForMood(
-            mood: selectedMood, 
+            selectedMood, 
             trigger: isRejectionRelated ? rejectionTrigger : nil
-        ) ?? ""
+        )
     }
     
     // Reset the form to default values
@@ -1613,373 +1505,6 @@ struct MoodView: View {
         copingStrategies = []
         selectedCopingStrategy = nil
     }
-    
-    // MARK: - Auto-Suggested Strategies View
-    
-    private var autoSuggestedStrategiesView: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Header
-            HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(.yellow)
-                    .font(.system(size: 22))
-                
-                Text("Suggested Coping Strategies")
-                    .font(MoodViewTextStyles.h3)
-                    .foregroundColor(MoodViewColors.textDark)
-                
-                Spacer()
-                
-                Button(action: {
-                    showingAutoSuggestedStrategies = false
-                    // Reset the mood form completely if user dismisses suggestions
-                    selectedMood = nil
-                    moodIntensity = initialIntensity
-                    showSavedConfirmation = true
-                    // Hide toast after delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation {
-                            showSavedConfirmation = false
-                        }
-                    }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(Color.gray.opacity(0.7))
-                        .font(.system(size: 24))
-                }
-            }
-            .padding(.bottom, 5)
-            
-            // Current mood indicator with a visual indicator
-            if let mood = selectedMood {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Current Mood")
-                            .font(MoodViewTextStyles.body3)
-                            .foregroundColor(MoodViewColors.textLight)
-                        
-                        Text(mood)
-                            .font(MoodViewTextStyles.body1.bold())
-                            .foregroundColor(MoodViewColors.textDark)
-                    }
-                    
-                    Divider()
-                        .frame(height: 30)
-                        .padding(.horizontal, 5)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Intensity")
-                            .font(MoodViewTextStyles.body3)
-                            .foregroundColor(MoodViewColors.textLight)
-                        
-                        HStack(spacing: 5) {
-                            Text("\(moodIntensity)")
-                                .font(MoodViewTextStyles.body1.bold())
-                                .foregroundColor(moodIntensity > 7 ? .red : (moodIntensity > 4 ? .orange : .green))
-                            
-                            Text("/ 10")
-                                .font(MoodViewTextStyles.body3)
-                                .foregroundColor(MoodViewColors.textLight)
-                        }
-                    }
-                }
-                .padding(12)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-                .padding(.bottom, 8)
-            }
-            
-            // Strategy cards section
-            if recommendedStrategies.isEmpty {
-                Text("No specific strategies found for this mood.")
-                    .font(MoodViewTextStyles.body2)
-                    .foregroundColor(MoodViewColors.textMedium)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 30)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(AppLayout.cornerRadius)
-            } else {
-                Text("These strategies might help you feel better right now:")
-                    .font(MoodViewTextStyles.body2)
-                    .foregroundColor(MoodViewColors.textDark)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(recommendedStrategies, id: \.self) { strategy in
-                            autoSuggestedStrategyCard(strategy)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-                .frame(height: 180)
-            }
-            
-            // Follow-up prompt (only shown after a strategy is selected)
-            if showFollowUpMoodPrompt, let previousMood = previousMood {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .foregroundColor(MoodViewColors.primary)
-                            .font(.system(size: 18))
-                        
-                        Text("How are you feeling now?")
-                            .font(MoodViewTextStyles.h4)
-                            .foregroundColor(MoodViewColors.textDark)
-                    }
-                    
-                    Text("Record your current mood intensity to track the effectiveness of the strategy:")
-                        .font(MoodViewTextStyles.body2)
-                        .foregroundColor(MoodViewColors.textMedium)
-                        .fixedSize(horizontal: false, vertical: true)
-                    
-                    // Slider for follow-up mood intensity
-                    VStack(spacing: 8) {
-                        // Visual comparison from before to after
-                        HStack(spacing: 0) {
-                            Text("Before: ")
-                                .font(MoodViewTextStyles.body3)
-                                .foregroundColor(MoodViewColors.textMedium)
-                            
-                            Text("\(previousIntensity)")
-                                .font(MoodViewTextStyles.body2.bold())
-                                .foregroundColor(previousIntensity > 7 ? .red : (previousIntensity > 4 ? .orange : .green))
-                            
-                            Spacer()
-                            
-                            Text("Now: ")
-                                .font(MoodViewTextStyles.body3)
-                                .foregroundColor(MoodViewColors.textMedium)
-                            
-                            Text("\(moodIntensity)")
-                                .font(MoodViewTextStyles.body2.bold())
-                                .foregroundColor(moodIntensity > 7 ? .red : (moodIntensity > 4 ? .orange : .green))
-                        }
-                        .padding(.horizontal, 4)
-                        
-                        Slider(value: Binding(
-                            get: { Double(moodIntensity) },
-                            set: { moodIntensity = Int(round($0)) }
-                        ), in: 1...10, step: 1)
-                        .accentColor(moodIntensity > 7 ? .red : (moodIntensity > 4 ? .orange : .green))
-                        .onChange(of: moodIntensity) { _ in
-                            // Force UI update when intensity changes
-                            AppHapticFeedback.light()
-                        }
-                        
-                        HStack {
-                            Text("1")
-                                .font(MoodViewTextStyles.caption)
-                                .foregroundColor(MoodViewColors.textLight)
-                            
-                            Spacer()
-                            
-                            ForEach([2, 3, 4, 5, 6, 7, 8, 9], id: \.self) { value in
-                                Capsule()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 1, height: 8)
-                                Spacer()
-                            }
-                            
-                            Text("10")
-                                .font(MoodViewTextStyles.caption)
-                                .foregroundColor(MoodViewColors.textLight)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    // Save follow-up mood button
-                    Button(action: saveFollowUpMood) {
-                        HStack {
-                            Text("Log Follow-up Mood")
-                                .font(MoodViewTextStyles.button)
-                            
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 16))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(MoodViewColors.primary)
-                        .cornerRadius(AppLayout.cornerRadius)
-                    }
-                }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(AppLayout.cornerRadius)
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-            }
-        }
-        .padding(24)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
-    }
-    
-    // Individual auto-suggested coping strategy card
-    private func autoSuggestedStrategyCard(_ strategy: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Strategy icon based on content
-                Image(systemName: strategyIcon(for: strategy))
-                    .font(.system(size: 20))
-                    .foregroundColor(MoodViewColors.primary)
-                    .frame(width: 28, height: 28)
-                    .padding(8)
-                    .background(MoodViewColors.primary.opacity(0.1))
-                    .cornerRadius(8)
-                
-                Text(strategy)
-                    .font(MoodViewTextStyles.body1)
-                    .foregroundColor(MoodViewColors.textDark)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            
-            Spacer()
-            
-            Button(action: {
-                selectedCopingStrategy = strategy
-                copingStrategy = strategy
-                showFollowUpMoodPrompt = true
-                AppHapticFeedback.selection()
-            }) {
-                HStack {
-                    Text("Try This")
-                        .font(MoodViewTextStyles.body3.bold())
-                    
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 12))
-                }
-                .foregroundColor(MoodViewColors.primary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(MoodViewColors.primary.opacity(0.1))
-                .cornerRadius(AppLayout.cornerRadius)
-            }
-        }
-        .frame(width: 200, height: 150)
-        .padding()
-        .background(MoodViewColors.cardBackground)
-        .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.08), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 15)
-                .stroke(selectedCopingStrategy == strategy ? MoodViewColors.primary : Color.clear, lineWidth: 2)
-        )
-    }
-    
-    // Get an appropriate icon for a strategy based on its content
-    private func strategyIcon(for strategy: String) -> String {
-        let lowercaseStrategy = strategy.lowercased()
-        
-        if lowercaseStrategy.contains("breath") || lowercaseStrategy.contains("deep") {
-            return "lungs.fill"
-        } else if lowercaseStrategy.contains("grounding") || lowercaseStrategy.contains("5-4-3-2-1") {
-            return "hands.sparkles.fill"
-        } else if lowercaseStrategy.contains("journal") || lowercaseStrategy.contains("write") {
-            return "square.and.pencil"
-        } else if lowercaseStrategy.contains("meditation") || lowercaseStrategy.contains("mindful") {
-            return "brain.head.profile"
-        } else if lowercaseStrategy.contains("exercise") || lowercaseStrategy.contains("walk") {
-            return "figure.walk"
-        } else if lowercaseStrategy.contains("talk") || lowercaseStrategy.contains("friend") {
-            return "bubble.left.and.bubble.right.fill"
-        } else {
-            return "lightbulb.fill"
-        }
-    }
-    
-    // Save follow-up mood after using a coping strategy
-    private func saveFollowUpMood() {
-        guard let mood = selectedMood, let strategy = selectedCopingStrategy else { return }
-        
-        // Save the updated mood with the coping strategy that was used
-        moodStore.saveMoodEntry(
-            mood: mood,
-            intensity: moodIntensity,
-            note: "Follow-up after trying: \(strategy)",
-            rejectionRelated: false,
-            rejectionTrigger: nil,
-            copingStrategy: strategy
-        )
-        
-        // Calculate and show effectiveness
-        let effectivenessMessage: String
-        if let prevIntensity = previousMood != nil ? previousIntensity : nil {
-            let improvement = prevIntensity - moodIntensity
-            if improvement > 0 {
-                effectivenessMessage = "Great job! Your mood improved by \(improvement) points."
-            } else if improvement == 0 {
-                effectivenessMessage = "Your mood intensity stayed the same. You might want to try a different strategy."
-            } else {
-                effectivenessMessage = "Your mood intensity increased. Consider consulting with a mental health professional if needed."
-            }
-            
-            // Show toast with effectiveness message
-            feedbackMessage = effectivenessMessage
-            showFeedbackMessage = true
-            
-            // Hide toast after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation {
-                    showFeedbackMessage = false
-                }
-            }
-        }
-        
-        // Reset all form data
-        selectedMood = nil
-        moodIntensity = initialIntensity
-        moodNote = ""
-        isRejectionRelated = false
-        rejectionTrigger = ""
-        copingStrategy = ""
-        selectedCopingStrategy = nil
-        showFollowUpMoodPrompt = false
-        showingAutoSuggestedStrategies = false
-        
-        // Success feedback
-        AppHapticFeedback.success()
-    }
-    
-    // Feedback message toast
-    private var feedbackMessageToast: some View {
-        VStack {
-            Spacer()
-            
-            Text(feedbackMessage)
-                .font(MoodViewTextStyles.body2)
-                .foregroundColor(.white)
-                .padding()
-                .background(MoodViewColors.primary)
-                .cornerRadius(AppLayout.cornerRadius)
-                .padding(.horizontal)
-                .padding(.bottom, 20)
-        }
-    }
-    
-    // Saved confirmation toast
-    private var savedConfirmationToast: some View {
-        VStack {
-            Spacer()
-            
-            Text("Mood saved successfully")
-                .font(MoodViewTextStyles.body2)
-                .foregroundColor(.white)
-                .padding()
-                .background(MoodViewColors.primary)
-                .cornerRadius(AppLayout.cornerRadius)
-                .padding(.horizontal)
-                .padding(.bottom, 20)
-        }
-    }
-    
-    // Setup observer in onAppear
-    func setupFollowUpObserver() {
-        followUpObserver.setupObserver()
-    }
 }
 
 // MARK: - Preview Provider
@@ -1987,10 +1512,7 @@ struct MoodView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.preview.container.viewContext
         let moodStore = MoodStore(context: context)
-        
-        // Create an EngineMoodStore for the MoodAnalysisEngine
-        let engineMoodStore = EngineMoodStore()
-        let moodAnalysisEngine = MoodAnalysisEngine(moodStore: engineMoodStore)
+        let moodAnalysisEngine = MoodAnalysisEngine(moodStore: moodStore)
         
         return MoodView(context: context, moodAnalysisEngine: moodAnalysisEngine)
             .environment(\.managedObjectContext, context)

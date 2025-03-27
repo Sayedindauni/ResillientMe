@@ -11,16 +11,7 @@ import UIKit
 
 // MARK: - Extensions for necessary components
 
-// Add text style button that was missing
-extension AppTextStyles {
-    static var button: Font {
-        return Font.system(size: 16, weight: .medium)
-    }
-    
-    static var caption: Font {
-        return Font.system(size: 12, weight: .regular)
-    }
-}
+// Remove the AppTextStyles extension but keep the View extensions
 
 // Extension for accessibility related functions
 extension View {
@@ -91,6 +82,32 @@ struct Resource: Identifiable {
     }
 }
 
+// MARK: - Mood Button View
+
+struct MoodButton: View {
+    let mood: Mood
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack {
+                Text(mood.emoji)
+                    .font(.system(size: 30))
+                Text(mood.name)
+                    .font(.caption)
+            }
+            .frame(width: 80, height: 80)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+            )
+        }
+    }
+}
+
 struct DashboardView: View {
     @State private var userName = "Friend"
     @State private var currentMood: Mood = .neutral
@@ -123,8 +140,12 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppLayout.spacing) {
+                // The AffirmationBanner is now shown above this view in ContentView
+                // Adjusted spacing to account for the banner above
+                
                 // Header with greeting and mood check-in
                 headerSection
+                    .padding(.top, 8) // Reduced top padding since AffirmationBanner is above
                 
                 // Stats section
                 statsSection
@@ -149,8 +170,7 @@ struct DashboardView: View {
         .sheet(isPresented: $showMoodPicker) {
             MoodPickerView(selectedMood: $currentMood) {
                 HapticFeedback.success()
-                showMoodPicker = false
-                announceToScreenReader("Mood saved as \(currentMood.name)")
+                announceToScreenReader("Mood updated to \(currentMood.name)")
             }
         }
     }
@@ -273,7 +293,7 @@ struct DashboardView: View {
                             Text("Join the conversation")
                             Image(systemName: "arrow.right")
                         }
-                        .font(AppTextStyles.button)
+                        .font(AppTextStyles.buttonFont)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                         .background(Color.white)
@@ -357,7 +377,7 @@ struct DashboardView: View {
             
             Button(action: {}) {
                 Text("Try Now")
-                    .font(AppTextStyles.button)
+                    .font(AppTextStyles.buttonFont)
                     .foregroundColor(AppColors.primary)
             }
             .padding(.top, 4)
@@ -424,7 +444,7 @@ struct StatsCard: View {
                 .foregroundColor(AppColors.textDark)
             
             Text(label)
-                .font(AppTextStyles.caption)
+                .font(AppTextStyles.captionText)
                 .foregroundColor(AppColors.textMedium)
                 .multilineTextAlignment(.center)
         }
@@ -466,7 +486,7 @@ struct ActivityCard: View {
             Button(action: {}) {
                 HStack {
                     Text("Start")
-                        .font(AppTextStyles.button)
+                        .font(AppTextStyles.buttonFont)
                     
                     Image(systemName: "arrow.right")
                         .font(.system(size: 12))
@@ -566,7 +586,7 @@ struct ResourceCard: View {
                         .font(.system(size: 10))
                     
                     Text(typeLabel)
-                        .font(AppTextStyles.caption)
+                        .font(AppTextStyles.captionText)
                 }
                 .foregroundColor(typeColor)
                 .padding(.top, 2)
@@ -593,82 +613,34 @@ struct MoodPickerView: View {
     @Binding var selectedMood: Mood
     let onSave: () -> Void
     
-    private let moodColors: [Mood: Color] = [
-        .joyful: AppColors.joy,
-        .content: AppColors.calm,
-        .neutral: AppColors.secondary,
-        .sad: AppColors.sadness,
-        .frustrated: AppColors.frustration,
-        .stressed: AppColors.error
-    ]
-    
     var body: some View {
-        VStack(spacing: 24) {
-            // Header
-            Text("How are you feeling today?")
-                .font(AppTextStyles.h3)
-                .foregroundColor(AppColors.textDark)
-                .padding(.top, 24)
+        VStack(spacing: 20) {
+            Text("How are you feeling?")
+                .font(.title2)
+                .fontWeight(.bold)
             
-            Text("Track your emotional state to build awareness")
-                .font(AppTextStyles.body1)
-                .foregroundColor(AppColors.textMedium)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            
-            Spacer()
-            
-            // Mood grid
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+            HStack(spacing: 16) {
                 ForEach(Mood.allCases) { mood in
-                    Button(action: {
+                    MoodButton(mood: mood, isSelected: selectedMood == mood) {
                         selectedMood = mood
-                        HapticFeedback.light()
-                    }) {
-                        VStack(spacing: 12) {
-                            Text(mood.emoji)
-                                .font(.system(size: 38))
-                                .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)
-                            
-                            Text(mood.name)
-                                .font(AppTextStyles.body1)
-                                .foregroundColor(selectedMood == mood ? moodColors[mood] : AppColors.textMedium)
-                        }
-                        .frame(height: 100)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                                .fill(selectedMood == mood ? moodColors[mood]!.opacity(0.1) : Color.clear)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                                .stroke(selectedMood == mood ? moodColors[mood]! : Color.clear, lineWidth: 2)
-                        )
                     }
-                    .buttonStyle(.plain)
-                    .makeAccessible(
-                        label: mood.name,
-                        hint: "Select if you're feeling \(mood.name)"
-                    )
                 }
             }
-            .padding(.horizontal)
             
-            Spacer()
-            
-            // Save button
             Button(action: onSave) {
-                Text("Save Mood")
-                    .font(AppTextStyles.button)
+                Text("Save")
+                    .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(AppColors.primary)
-                    .cornerRadius(AppLayout.cornerRadius)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(10)
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 32)
+            .padding(.horizontal)
         }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
     }
 }
 

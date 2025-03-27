@@ -8,9 +8,9 @@
 import Foundation
 import CoreData
 
-// Extension to create a MoodEntry object from ContentView
-extension MoodEntry {
-    // Factory method to create a MoodEntry with the contentView parameters
+// Extension to create a MoodEntryEntity object from ContentView
+extension MoodEntryEntity {
+    // Factory method to create a MoodEntryEntity with the contentView parameters
     static func create(
         withID id: String,
         date: Date,
@@ -20,8 +20,8 @@ extension MoodEntry {
         rejectionTrigger: String?,
         copingStrategy: String?,
         in context: NSManagedObjectContext
-    ) -> MoodEntry {
-        let entry = MoodEntry(context: context)
+    ) -> MoodEntryEntity {
+        let entry = MoodEntryEntity(context: context)
         entry.id = id
         entry.date = date
         entry.mood = mood
@@ -36,7 +36,7 @@ extension MoodEntry {
     }
     
     // Add mock array support for in-memory testing
-    static func create(fromArray entries: [MoodEntry]) -> [MoodEntry] {
+    static func create(fromArray entries: [MoodEntryEntity]) -> [MoodEntryEntity] {
         return entries
     }
 }
