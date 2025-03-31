@@ -1,4 +1,5 @@
 import SwiftUI
+import ResilientMe
 
 struct OnboardingScreenView: View {
     @Binding var isPresented: Bool

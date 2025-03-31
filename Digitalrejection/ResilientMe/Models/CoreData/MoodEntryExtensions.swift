@@ -7,10 +7,13 @@
 
 import Foundation
 import CoreData
+import ResilientMe
 
 // Extension to create a MoodEntryEntity object from ContentView
+// Use direct extension with fully-qualified CoreData module path
 extension MoodEntryEntity {
     // Factory method to create a MoodEntryEntity with the contentView parameters
+    @discardableResult
     static func create(
         withID id: String,
         date: Date,
@@ -22,15 +25,16 @@ extension MoodEntryEntity {
         in context: NSManagedObjectContext
     ) -> MoodEntryEntity {
         let entry = MoodEntryEntity(context: context)
-        entry.id = id
-        entry.date = date
-        entry.mood = mood
-        entry.intensity = Int16(intensity)
-        entry.note = note
-        entry.rejectionTrigger = rejectionTrigger
-        entry.copingStrategy = copingStrategy
-        entry.rejectionRelated = (rejectionTrigger != nil)
-        entry.journalPromptShown = false
+        // Use setValue to avoid direct property access issues
+        entry.setValue(id, forKey: "id")
+        entry.setValue(date, forKey: "date")
+        entry.setValue(mood, forKey: "mood")
+        entry.setValue(Int16(intensity), forKey: "intensity")
+        entry.setValue(note, forKey: "note")
+        entry.setValue(rejectionTrigger, forKey: "rejectionTrigger")
+        entry.setValue(copingStrategy, forKey: "copingStrategy")
+        entry.setValue(rejectionTrigger != nil, forKey: "rejectionRelated")
+        entry.setValue(false, forKey: "journalPromptShown")
         
         return entry
     }

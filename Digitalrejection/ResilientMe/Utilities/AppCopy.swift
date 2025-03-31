@@ -9,10 +9,23 @@ import Foundation
 // Import the Strategy type from AppTypes
 import SwiftUI
 
-// Supporting Types are now moved to a separate AppTypes.swift file
+// Supporting Types
+
+// Definition for Strategy type
+public struct CopingStrategy {
+    let title: String
+    let description: String
+}
+
+// Definition for OnboardingMessage type
+public struct AppOnboardingMessage {
+    let title: String
+    let subtitle: String
+    let message: String
+}
 
 /// Centralized location for app copy, making it easier to maintain consistent voice and tone
-public struct AppCopy {
+public struct LocalAppCopy {
     // MARK: - Affirmations
     
     static let affirmations = [
@@ -93,71 +106,71 @@ public struct AppCopy {
     // MARK: - Coping Strategies
     
     static let copingStrategies = [
-        Strategy(
+        CopingStrategy(
             title: "5-4-3-2-1 Grounding",
             description: "Name 5 things you can see, 4 things you can touch, 3 things you can hear, 2 things you can smell, and 1 thing you can taste."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Breath Focus",
             description: "Breathe in for 4 counts, hold for 2, exhale for 6. Repeat for 2 minutes to activate your parasympathetic nervous system."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Digital Detox",
             description: "Take a 30-minute break from all screens. Go for a walk, journal, or connect with someone in person."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Self-Compassion Practice",
             description: "Place your hand on your heart and say: 'This is a moment of suffering. Suffering is part of life. May I be kind to myself in this moment.'"
         ),
-        Strategy(
+        CopingStrategy(
             title: "Gratitude Shift",
             description: "List 3 things you're grateful for right now, no matter how small. This can help shift your perspective away from rejection."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Physical Reset",
             description: "Do 10 jumping jacks, 10 squats, or dance to your favorite song. Physical movement releases tension and anxiety."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Emotion Naming",
             description: "Identify and name your emotions specifically. Research shows naming feelings reduces their intensity."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Future Self Letter",
             description: "Write a brief letter from your future self who has moved past this rejection. What wisdom would they share?"
         ),
-        Strategy(
+        CopingStrategy(
             title: "Rejection Reframe",
             description: "List three possible alternative explanations for the rejection that don't involve your worth or abilities."
         ),
-        Strategy(
+        CopingStrategy(
             title: "Value Alignment",
             description: "Identify one personal value you can honor today, regardless of external validation."
         )
     ]
     
-    public static func randomCopingStrategy() -> Strategy {
+    public static func randomCopingStrategy() -> CopingStrategy {
         return copingStrategies.randomElement() ?? copingStrategies[0]
     }
     
     // MARK: - Onboarding Messages
     
     static let onboardingMessages = [
-        OnboardingMessage(
+        AppOnboardingMessage(
             title: "It's OK to Feel",
             subtitle: "Rejection is universal",
             message: "Everyone experiences rejection, especially in the digital age. Your feelings are valid and shared by many."
         ),
-        OnboardingMessage(
+        AppOnboardingMessage(
             title: "Build Resilience",
             subtitle: "Turn pain into growth",
             message: "Each rejection is an opportunity to develop emotional strength that will serve you throughout life."
         ),
-        OnboardingMessage(
+        AppOnboardingMessage(
             title: "Process & Release",
             subtitle: "Track, reflect, move forward",
             message: "ResilientMe helps you safely process difficult emotions and transform rejection into deeper self-understanding."
         ),
-        OnboardingMessage(
+        AppOnboardingMessage(
             title: "You're Not Alone",
             subtitle: "Connect with others",
             message: "Share experiences and insights with a community that understands what you're going through."

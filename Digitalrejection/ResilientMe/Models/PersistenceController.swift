@@ -19,15 +19,15 @@ struct PersistenceController {
         // Create sample mood entries for preview
         for i in 0..<5 {
             let newItem = MoodEntryEntity(context: viewContext)
-            newItem.id = UUID().uuidString
-            newItem.date = Date(timeIntervalSinceNow: Double(-i * 86400))
-            newItem.mood = ["Happy", "Sad", "Anxious", "Calm", "Angry"][i % 5]
-            newItem.intensity = Int16(i % 5 + 1)
-            newItem.note = "Sample note for entry \(i+1)"
-            newItem.rejectionRelated = i % 2 == 0
+            newItem.setValue(UUID().uuidString, forKey: "id")
+            newItem.setValue(Date(timeIntervalSinceNow: Double(-i * 86400)), forKey: "date")
+            newItem.setValue(["Happy", "Sad", "Anxious", "Calm", "Angry"][i % 5], forKey: "mood")
+            newItem.setValue(Int16(i % 5 + 1), forKey: "intensity")
+            newItem.setValue("Sample note for entry \(i+1)", forKey: "note")
+            newItem.setValue(i % 2 == 0, forKey: "rejectionRelated")
             if i % 2 == 0 {
-                newItem.rejectionTrigger = "Sample trigger \(i+1)"
-                newItem.copingStrategy = "Sample strategy \(i+1)"
+                newItem.setValue("Sample trigger \(i+1)", forKey: "rejectionTrigger")
+                newItem.setValue("Sample strategy \(i+1)", forKey: "copingStrategy")
             }
         }
         

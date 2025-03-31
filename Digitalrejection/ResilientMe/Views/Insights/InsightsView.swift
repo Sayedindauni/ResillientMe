@@ -9,6 +9,25 @@ import SwiftUI
 import Charts
 import CoreData
 import Combine
+import Foundation
+// Import the main app module to access shared types
+import ResilientMe
+
+// Import MoodAnalysisEngine to get access to the StrategyEffectivenessStore
+// This file contains the EngineModels enum namespace
+import class ResilientMe.MoodAnalysisEngine
+import class ResilientMe.StrategyEffectivenessStore
+import enum ResilientMe.EngineModels
+
+// Forward reference to PersonalizedFeedbackView - using the one from PersonalizedFeedbackView.swift
+// struct PersonalizedFeedbackView: View {
+//     var analysisEngine: MoodAnalysisEngine
+//     
+//     var body: some View {
+//         Text("Personalized Feedback View")
+//             .padding()
+//     }
+// }
 
 struct InsightsView: View {
     @ObservedObject var moodAnalysisEngine: MoodAnalysisEngine
@@ -47,7 +66,7 @@ struct InsightsView: View {
                     .padding(.horizontal)
                     
                     // Recommendations card if available
-                    if !moodAnalysisEngine.currentRecommendations.isEmpty {
+                    if !moodAnalysisEngine.displayRecommendations.isEmpty {
                         recommendationsCard
                     }
                     
@@ -85,7 +104,7 @@ struct InsightsView: View {
                 }
             }
             .navigationTitle("Insights")
-            .background(Color(UIColor(named: "Background") ?? .systemBackground).ignoresSafeArea())
+            .background(Color.secondary.opacity(0.1).ignoresSafeArea())
         }
         .sheet(isPresented: $showingRecommendations) {
             PersonalizedFeedbackView(analysisEngine: moodAnalysisEngine)
@@ -123,7 +142,7 @@ struct InsightsView: View {
                 }
             }
             
-            let recommendation = moodAnalysisEngine.currentRecommendations.first!
+            let recommendation = moodAnalysisEngine.displayRecommendations.first!
             
             Text(recommendation.title)
                 .font(.subheadline)
@@ -149,7 +168,7 @@ struct InsightsView: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -169,7 +188,7 @@ struct InsightsView: View {
                         x: .value("Mood", item.mood),
                         y: .value("Count", animateCharts ? item.count : 0)
                     )
-                    .foregroundStyle(Color(getMoodColor(mood: item.mood)))
+                    .foregroundStyle(getMoodColor(mood: item.mood))
                     .cornerRadius(8)
                 }
             }
@@ -182,7 +201,7 @@ struct InsightsView: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -216,7 +235,7 @@ struct InsightsView: View {
             .chartYScale(domain: [0, 10])
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -229,16 +248,15 @@ struct InsightsView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            // This would be a placeholder for real chart data from MoodStore
+            // Using BarMark instead of SectorMark for compatibility
             Chart {
                 ForEach(dummyTriggerData) { item in
-                    SectorMark(
-                        angle: .value("Percentage", animateCharts ? item.percentage : 0),
-                        innerRadius: .ratio(0.5),
-                        angularInset: 1.5
+                    BarMark(
+                        x: .value("Category", item.category),
+                        y: .value("Percentage", animateCharts ? item.percentage : 0)
                     )
-                    .cornerRadius(5)
-                    .foregroundStyle(Color(getTriggerColor(trigger: item.category)))
+                    .foregroundStyle(getTriggerColor(trigger: item.category))
+                    .cornerRadius(8)
                 }
             }
             .frame(height: 200)
@@ -248,7 +266,7 @@ struct InsightsView: View {
                 ForEach(dummyTriggerData) { item in
                     HStack {
                         Circle()
-                            .fill(Color(getTriggerColor(trigger: item.category)))
+                            .fill(getTriggerColor(trigger: item.category))
                             .frame(width: 10, height: 10)
                         
                         Text(item.category)
@@ -266,7 +284,7 @@ struct InsightsView: View {
             .padding(.top, 8)
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -311,7 +329,7 @@ struct InsightsView: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -585,25 +603,25 @@ struct InsightsView: View {
     
     // MARK: - Helper Functions
     
-    private func getMoodColor(mood: String) -> UIColor {
+    private func getMoodColor(mood: String) -> Color {
         switch mood {
-        case "Joyful": return UIColor(named: "Joy") ?? .systemYellow
-        case "Content": return UIColor(named: "Calm") ?? .systemBlue
-        case "Neutral": return UIColor.lightGray
-        case "Sad": return UIColor(named: "Sadness") ?? .systemIndigo
-        case "Frustrated": return UIColor(named: "Frustration") ?? .systemOrange
-        case "Stressed": return UIColor(named: "Stressed") ?? .systemRed
-        default: return UIColor(named: "Primary") ?? .systemBlue
+        case "Joyful": return Color("Joy")
+        case "Content": return Color("Calm")
+        case "Neutral": return Color.gray
+        case "Sad": return Color("Sadness")
+        case "Frustrated": return Color("Frustration")
+        case "Stressed": return Color("Stressed")
+        default: return Color("Primary")
         }
     }
     
-    private func getTriggerColor(trigger: String) -> UIColor {
+    private func getTriggerColor(trigger: String) -> Color {
         switch trigger {
-        case "Social": return UIColor(named: "Primary") ?? .systemBlue
-        case "Work": return UIColor(named: "Secondary") ?? .systemGreen
-        case "Family": return UIColor(named: "Accent1") ?? .systemOrange
-        case "Academic": return UIColor(named: "Accent2") ?? .systemPurple
-        default: return UIColor.lightGray
+        case "Social": return Color("Primary")
+        case "Work": return Color("Secondary")
+        case "Family": return Color("Accent1")
+        case "Academic": return Color("Accent2")
+        default: return Color.gray
         }
     }
     
@@ -915,9 +933,8 @@ struct StrategyDetailsView: View {
                 .padding()
             }
             .navigationTitle("Strategy Progress")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         presentationMode.wrappedValue.dismiss()
                     }

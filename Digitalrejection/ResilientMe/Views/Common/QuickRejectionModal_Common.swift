@@ -75,7 +75,7 @@ struct QuickRejectionModalCommon: View {
                                 ForEach(rejectionTriggers, id: \.self) { trigger in
                                     Button(action: {
                                         selectedTrigger = trigger
-                                        HapticFeedback.light()
+                                        AppHapticFeedback.light()
                                     }) {
                                         let isSelected = selectedTrigger == trigger
                                         let textColor = isSelected ? Color.white : AppColors.textDark
@@ -108,7 +108,7 @@ struct QuickRejectionModalCommon: View {
                             ForEach(moods, id: \.self) { mood in
                                 Button(action: {
                                     selectedMood = mood
-                                    HapticFeedback.light()
+                                    AppHapticFeedback.light()
                                 }) {
                                     let isSelected = selectedMood == mood
                                     let moodIconColor = isSelected ? Color.white : moodColor(for: mood)
@@ -190,7 +190,7 @@ struct QuickRejectionModalCommon: View {
     }
     
     private func saveRejection() {
-        HapticFeedback.success()
+        AppHapticFeedback.success()
         
         // Call the onSave callback with the rejection details
         onSave?(

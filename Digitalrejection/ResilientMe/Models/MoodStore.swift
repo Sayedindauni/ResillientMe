@@ -199,27 +199,21 @@ struct JournalPrompts {
 }
 
 // MARK: - Strategy Effectiveness Store
-class StrategyEffectivenessStore: ObservableObject {
-    static let shared = StrategyEffectivenessStore()
-    
-    @Published var ratingData: [StrategyRating] = []
+// Using the shared StrategyEffectivenessStore from MoodEngineModels
+// Added implementation details for backward compatibility
+
+// Wrapper class to hold properties that can't go in an extension
+class StrategyEffectivenessStoreHelper {
+    static let shared = StrategyEffectivenessStoreHelper()
     @Published var recommendationWeights: [String: Double] = [:]
-    @Published var userPreferences: UserStrategyPreferences
+    @Published var userPreferences: UserStrategyPreferences = UserStrategyPreferences.default
     
-    private let userDefaults = UserDefaults.standard
-    
-    struct StrategyRating: Codable, Identifiable {
-        let id: UUID
-        let strategy: String
-        let rating: Int
-        let timestamp: Date
-        let moodBefore: String?
-        let moodAfter: String?
-        let moodImpact: String?
-        let notes: String?
-        let completionTime: TimeInterval?
+    private init() {
+        // Private initializer for singleton
+        initializeDefaultWeights()
     }
     
+    // User preferences type
     struct UserStrategyPreferences: Codable {
         var preferredDuration: StrategyDuration
         var preferredTimeOfDay: [TimeOfDay]
@@ -250,41 +244,8 @@ class StrategyEffectivenessStore: ObservableObject {
         }
     }
     
-    init() {
-        // Initialize with default user preferences
-        userPreferences = UserStrategyPreferences.default
-        
-        // Load existing data
-        if let savedRatings = userDefaults.data(forKey: "strategyRatings") {
-            if let decoded = try? JSONDecoder().decode([StrategyRating].self, from: savedRatings) {
-                ratingData = decoded
-            }
-        }
-        
-        if let savedWeights = userDefaults.data(forKey: "recommendationWeights") {
-            if let decoded = try? JSONDecoder().decode([String: Double].self, from: savedWeights) {
-                recommendationWeights = decoded
-            }
-        } else {
-            // Initialize with default weights
-            recommendationWeights = [
-                "mindfulness": 1.0,
-                "cognitive": 1.0,
-                "physical": 1.0,
-                "social": 1.0,
-                "creative": 1.0,
-                "selfCare": 1.0
-            ]
-        }
-        
-        if let savedPreferences = userDefaults.data(forKey: "userStrategyPreferences") {
-            if let decoded = try? JSONDecoder().decode(UserStrategyPreferences.self, from: savedPreferences) {
-                userPreferences = decoded
-            }
-        }
-    }
-    
-    private func initializeDefaultWeights() {
+    // Initialize default weights
+    func initializeDefaultWeights() {
         recommendationWeights = [
             "mindfulness": 1.0,
             "cognitive": 1.0,
@@ -294,38 +255,40 @@ class StrategyEffectivenessStore: ObservableObject {
             "selfCare": 1.0
         ]
     }
+}
+
+// Extend the shared StrategyEffectivenessStore with additional functionality
+extension StrategyEffectivenessStore {
+    private var helper: StrategyEffectivenessStoreHelper { StrategyEffectivenessStoreHelper.shared }
+    private var userDefaults: UserDefaults { UserDefaults.standard }
     
-    // Add a new rating for a strategy
-    func addRating(
-        for strategy: String,
-        rating: Int,
-        moodBefore: String? = nil,
-        moodAfter: String? = nil,
-        moodImpact: String? = nil,
-        notes: String? = nil,
-        completionTime: TimeInterval? = nil
-    ) {
-        let newRating = StrategyRating(
-            id: UUID(),
-            strategy: strategy,
-            rating: rating,
-            timestamp: Date(),
-            moodBefore: moodBefore,
-            moodAfter: moodAfter,
-            moodImpact: moodImpact,
-            notes: notes,
-            completionTime: completionTime
-        )
-        
-        ratingData.append(newRating)
-        saveRatings()
-        
-        // Update recommendation weights based on new rating
-        updateRecommendationWeights()
+    // Access helper properties
+    var recommendationWeights: [String: Double] {
+        get { helper.recommendationWeights }
+        set { helper.recommendationWeights = newValue }
+    }
+    
+    var userPreferences: StrategyEffectivenessStoreHelper.UserStrategyPreferences {
+        get { helper.userPreferences }
+        set { helper.userPreferences = newValue }
+    }
+    
+    // Save ratings to UserDefaults
+    func saveRatings() {
+        if let encoded = try? JSONEncoder().encode(ratingData) {
+            userDefaults.set(encoded, forKey: "strategyRatings")
+        }
+    }
+    
+    // Save weights to UserDefaults
+    func saveWeights() {
+        if let encoded = try? JSONEncoder().encode(recommendationWeights) {
+            userDefaults.set(encoded, forKey: "recommendationWeights")
+        }
     }
     
     // Update weighting for recommendations based on user feedback
-    private func updateRecommendationWeights() {
+    func updateRecommendationWeights() {
         // Skip if not enough data
         guard ratingData.count >= 3 else { return }
         
@@ -333,11 +296,10 @@ class StrategyEffectivenessStore: ObservableObject {
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
         let recentRatings = ratingData.filter { $0.timestamp > thirtyDaysAgo }
         
-        // Group ratings by strategy category (you'll need to extract category from strategy name or add it to StrategyRating)
+        // Group ratings by strategy category
         var categoryRatings: [String: [Int]] = [:]
         
         for rating in recentRatings {
-            // This is a simplified example - in reality, you'd determine the category from the strategy
             let category = getCategoryForStrategy(rating.strategy)
             if categoryRatings[category] == nil {
                 categoryRatings[category] = []
@@ -350,7 +312,6 @@ class StrategyEffectivenessStore: ObservableObject {
             let average = Double(ratings.reduce(0, +)) / Double(ratings.count)
             
             // Weight is scaled between 0.5 and 2.0 based on ratings (1-5)
-            // 1 star = 0.5 weight, 5 stars = 2.0 weight
             let weight = 0.5 + (average - 1.0) * 0.375 // Maps 1-5 to 0.5-2.0
             
             // Update weight (with some inertia from existing weight)
@@ -375,7 +336,7 @@ class StrategyEffectivenessStore: ObservableObject {
     }
     
     // Get strategy category - in a real app, this would use your data model
-    private func getCategoryForStrategy(_ strategy: String) -> String {
+    func getCategoryForStrategy(_ strategy: String) -> String {
         // This is a placeholder implementation
         // In your app, you would look up the actual category from your data model
         if strategy.lowercased().contains("breath") || strategy.lowercased().contains("meditat") {
@@ -394,25 +355,11 @@ class StrategyEffectivenessStore: ObservableObject {
     }
     
     // Updates user preferences
-    func updateUserPreferences(_ newPreferences: UserStrategyPreferences) {
-        userPreferences = newPreferences
+    func updateUserPreferences(_ newPreferences: StrategyEffectivenessStoreHelper.UserStrategyPreferences) {
+        helper.userPreferences = newPreferences
         
         if let encoded = try? JSONEncoder().encode(userPreferences) {
             userDefaults.set(encoded, forKey: "userStrategyPreferences")
-        }
-    }
-    
-    // Save ratings to UserDefaults
-    private func saveRatings() {
-        if let encoded = try? JSONEncoder().encode(ratingData) {
-            userDefaults.set(encoded, forKey: "strategyRatings")
-        }
-    }
-    
-    // Save weights to UserDefaults
-    private func saveWeights() {
-        if let encoded = try? JSONEncoder().encode(recommendationWeights) {
-            userDefaults.set(encoded, forKey: "recommendationWeights")
         }
     }
     
@@ -436,55 +383,6 @@ class StrategyEffectivenessStore: ObservableObject {
         return recommendationWeights
     }
     
-    // Get completion count for a strategy
-    func getCompletionCount(for strategy: String) -> Int {
-        return ratingData.filter { $0.strategy == strategy }.count
-    }
-    
-    // Get average rating for a strategy
-    func getAverageRating(for strategy: String) -> Double {
-        let ratings = ratingData.filter { $0.strategy == strategy }.map { $0.rating }
-        guard !ratings.isEmpty else { return 0 }
-        return Double(ratings.reduce(0, +)) / Double(ratings.count)
-    }
-    
-    // Get most effective strategies
-    func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
-        var strategyRatings: [String: [Int]] = [:]
-        
-        // Group ratings by strategy
-        for rating in ratingData {
-            if strategyRatings[rating.strategy] == nil {
-                strategyRatings[rating.strategy] = []
-            }
-            strategyRatings[rating.strategy]?.append(rating.rating)
-        }
-        
-        // Calculate average rating for each strategy
-        let averages = strategyRatings.map { (strategy, ratings) in
-            (strategy: strategy, rating: Double(ratings.reduce(0, +)) / Double(ratings.count))
-        }
-        
-        // Sort by rating and return top 5
-        return averages.sorted { $0.rating > $1.rating }.prefix(5).map { $0 }
-    }
-    
-    // Get most used strategies
-    func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
-        var strategyCounts: [String: Int] = [:]
-        
-        // Count usage of each strategy
-        for rating in ratingData {
-            strategyCounts[rating.strategy, default: 0] += 1
-        }
-        
-        // Convert to array and sort by count
-        return strategyCounts.map { (strategy: $0.key, count: $0.value) }
-            .sorted { $0.count > $1.count }
-            .prefix(5)
-            .map { $0 }
-    }
-    
     // Get strategy trend over time
     func getStrategyTrend(for strategy: String) -> [Double] {
         // Get all ratings for this strategy, sorted by date
@@ -501,18 +399,11 @@ class StrategyEffectivenessStore: ObservableObject {
         // Return the last 5 ratings
         return Array(ratings.suffix(5))
     }
-    
-    // Get rating history for a strategy
-    func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
-        return ratingData
-            .filter { $0.strategy == strategy }
-            .sorted { $0.timestamp < $1.timestamp }
-            .map { (date: $0.timestamp, rating: $0.rating) }
-    }
 }
 
 // MARK: - MoodStore for CoreData interactions
-class MoodStore: ObservableObject {
+// Rename to avoid redeclaration or use an extension instead
+class CoreDataMoodStore: ObservableObject, MoodStoreProtocol {
     @Published var moodEntries: [MoodData] = []
     @Published var recentMoods: [String] = []
     private let context: NSManagedObjectContext
@@ -738,14 +629,14 @@ class MoodStore: ObservableObject {
                 
                 return false
             }
-            .sorted(by: { 
+            .sorted(by: { entry1, entry2 -> Bool in 
                 // Sort by: 1) Rejection-related first, 2) Higher intensity, 3) More recent
-                if $0.rejectionRelated != $1.rejectionRelated {
-                    return $0.rejectionRelated
-                } else if $0.intensity != $1.intensity {
-                    return $0.intensity > $1.intensity
+                if entry1.rejectionRelated != entry2.rejectionRelated {
+                    return entry1.rejectionRelated
+                } else if entry1.intensity != entry2.intensity {
+                    return entry1.intensity > entry2.intensity
                 } else {
-                    return $0.date > $1.date
+                    return entry1.date > entry2.date
                 }
             })
             .prefix(3) // Limit to 3 most important entries
@@ -793,4 +684,52 @@ class MoodStore: ObservableObject {
             )
         }
     }
-} 
+    
+    // Convert CoreData MoodEntry to MoodData model
+    func convertToMoodData(entry: MoodEntryEntity) -> MoodData {
+        return MoodData(
+            id: entry.id ?? UUID().uuidString,
+            date: entry.date ?? Date(),
+            mood: entry.mood ?? "",
+            customMood: nil,
+            intensity: Int(entry.intensity),
+            note: nil,
+            rejectionRelated: false,
+            rejectionTrigger: nil,
+            copingStrategy: nil
+        )
+    }
+}
+
+// MARK: - CoreDataMoodStore Extension for StrategyEffectivenessStore integration
+
+// Extension to CoreDataMoodStore that integrates with StrategyEffectivenessStore
+extension CoreDataMoodStore {
+    // Access the shared StrategyEffectivenessStore
+    var strategyStore: StrategyEffectivenessStore { StrategyEffectivenessStore.shared }
+    
+    // Delegate to StrategyEffectivenessStore's getCompletionCount
+    func getCompletionCount(for strategy: String) -> Int {
+        return strategyStore.getCompletionCount(for: strategy)
+    }
+    
+    // Delegate to StrategyEffectivenessStore's getAverageRating
+    func getAverageRating(for strategy: String) -> Double {
+        return strategyStore.getAverageRating(for: strategy)
+    }
+    
+    // Delegate to StrategyEffectivenessStore's getMostEffectiveStrategies
+    func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
+        return strategyStore.getMostEffectiveStrategies()
+    }
+    
+    // Delegate to StrategyEffectivenessStore's getMostUsedStrategies
+    func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
+        return strategyStore.getMostUsedStrategies()
+    }
+    
+    // Delegate to StrategyEffectivenessStore's getRatingHistory
+    func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
+        return strategyStore.getRatingHistory(for: strategy)
+    }
+}

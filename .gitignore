@@ -1,0 +1,8 @@
+# Xcode
+xcuserdata/
+build/
+DerivedData/
+*.o
+*.bak
+.DS_Store
+*.tmp

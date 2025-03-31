@@ -1,4 +1,5 @@
 import SwiftUI
+import ResilientMe
 
 struct ProfileView: View {
     // User profile information

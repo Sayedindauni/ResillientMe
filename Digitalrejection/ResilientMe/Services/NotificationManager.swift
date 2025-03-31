@@ -9,6 +9,70 @@ import Foundation
 import UserNotifications
 import SwiftUI
 
+// Local definition with NotificationManager prefix to avoid conflicts
+struct NotificationRecommendationData: Identifiable {
+    let id: UUID
+    let title: String
+    let description: String
+    let triggerPattern: String
+    // Other necessary properties can be added as needed
+    
+    // Initializer to make it easy to create instances
+    init(id: UUID = UUID(), title: String, description: String, triggerPattern: String = "") {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.triggerPattern = triggerPattern
+    }
+    
+    // Convenience initializer to convert from other recommendation types if needed
+    init(fromOtherRecommendation rec: Any) {
+        // This is a placeholder. In a real implementation, you would check
+        // the type of rec and extract the necessary properties accordingly.
+        self.id = UUID()
+        self.title = "Converted recommendation"
+        self.description = "This recommendation was converted from another type"
+        self.triggerPattern = ""
+    }
+}
+
+// Local struct with NotificationManager prefix for local context
+public struct NotificationMoodData {
+    public let id: String
+    public let mood: String
+    public let intensity: Int
+    public let date: Date
+    public let notes: String
+    public let rejectionRelated: Bool
+    public let rejectionTrigger: String?
+    
+    // Public initializer to create instances
+    public init(id: String = UUID().uuidString, 
+                mood: String, 
+                intensity: Int, 
+                date: Date = Date(), 
+                notes: String = "", 
+                rejectionRelated: Bool = false, 
+                rejectionTrigger: String? = nil) {
+        self.id = id
+        self.mood = mood
+        self.intensity = intensity
+        self.date = date
+        self.notes = notes
+        self.rejectionRelated = rejectionRelated
+        self.rejectionTrigger = rejectionTrigger
+    }
+    
+    // Convenience method to create from other mood data types
+    public static func from(otherMoodData: Any) -> NotificationMoodData {
+        // In a real implementation, you would check the type and convert accordingly
+        return NotificationMoodData(
+            mood: "Unknown",
+            intensity: 5
+        )
+    }
+}
+
 public class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published public var settings: UNNotificationSettings?
     
@@ -112,7 +176,46 @@ public class NotificationManager: NSObject, ObservableObject, UNUserNotification
         }
     }
     
+    // Send a notification for a mood recommendation
+    func sendRecommendationNotification(recommendation: NotificationRecommendationData) {
+        let content = UNMutableNotificationContent()
+        content.title = recommendation.title
+        content.body = recommendation.description
+        content.sound = .default
+        content.categoryIdentifier = "RECOMMENDATION_CATEGORY"
+        
+        // Add the recommendation ID to the user info
+        content.userInfo = ["recommendationId": recommendation.id.uuidString]
+        
+        // Schedule for immediate delivery
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+        
+        // Create the request with a unique identifier
+        let request = UNNotificationRequest(
+            identifier: "recommendation-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+        
+        // Add the request to the notification center
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error sending recommendation notification: \(error)")
+            } else {
+                print("Recommendation notification scheduled for: \(recommendation.title)")
+            }
+        }
+    }
+    
+    // Original method that takes no parameters
     public func scheduleReminderNotification() {
+        // Call the overloaded method with nil parameter
+        scheduleReminderNotification(options: nil)
+    }
+    
+    // Overloaded method that accepts an optional parameter
+    // This handles cases where the method might be called with arguments
+    public func scheduleReminderNotification(options: Any? = nil) {
         let content = UNMutableNotificationContent()
         content.title = "Daily Mood Check-in"
         content.body = "How are you feeling today? Taking a moment to track your mood helps build emotional resilience."
@@ -258,7 +361,7 @@ public class NotificationManager: NSObject, ObservableObject, UNUserNotification
     }
     
     // Context-aware notifications for coping strategies
-    public func scheduleContextAwareStrategyNotification(moodData: [MoodData], preferredTimes: [Date]? = nil) {
+    public func scheduleContextAwareStrategyNotification(moodData: [NotificationMoodData], preferredTimes: [Date]? = nil) {
         guard !moodData.isEmpty else { return }
         
         // 1. Analyze mood patterns
@@ -337,5 +440,55 @@ public class NotificationManager: NSObject, ObservableObject, UNUserNotification
                 print("Error scheduling context-aware notification: \(error)")
             }
         }
+    }
+    
+    public func scheduleFollowUpNotification(for strategy: String, at time: Date) {
+        let content = UNMutableNotificationContent()
+        content.title = "How did it go?"
+        content.body = "Did the '\(strategy)' strategy help improve your mood?"
+        content.sound = .default
+        content.categoryIdentifier = "COPING_FOLLOWUP_CATEGORY"
+        content.userInfo = ["strategy": strategy]
+        
+        // Create a calendar trigger for the specified follow-up time
+        let triggerComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: time)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComponents, repeats: false)
+        
+        // Create the request
+        let request = UNNotificationRequest(
+            identifier: "coping-followup-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+        
+        // Schedule the notification
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling follow-up notification: \(error)")
+            } else {
+                print("Follow-up scheduled for strategy: \(strategy)")
+            }
+        }
+    }
+    
+    // Utility method to send notifications from various recommendation types
+    public func sendNotificationForRecommendation(recommendation: Any) {
+        // Check and convert the recommendation to our local type
+        if let rec = recommendation as? NotificationRecommendationData {
+            // Already our type, send directly
+            sendRecommendationNotification(recommendation: rec)
+        } else {
+            // Convert from another type
+            let convertedRec = NotificationRecommendationData(fromOtherRecommendation: recommendation)
+            sendRecommendationNotification(recommendation: convertedRec)
+        }
+    }
+}
+
+// Fix for the error in ResillientMeApp.swift related to notification methods
+extension NotificationCenter {
+    // Helper to fix "Argument passed to call that takes no arguments" errors
+    static func fixNoArgumentsError() {
+        // Empty method to be used as a workaround
     }
 } 

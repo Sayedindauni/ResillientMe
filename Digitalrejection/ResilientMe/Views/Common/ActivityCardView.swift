@@ -1,4 +1,5 @@
 import SwiftUI
+import ResilientMe
 
 /// A specialized card view for displaying activities on the dashboard
 struct ActivityCardView: View {
@@ -152,7 +153,7 @@ struct ActivityCardView_Previews: PreviewProvider {
             QuickActionCardView(
                 title: "Track Mood",
                 iconName: "chart.bar.fill",
-                color: AppColors.joy,
+                color: AppColors.primary,
                 action: { print("Quick action tapped") }
             )
         }

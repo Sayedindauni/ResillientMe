@@ -100,9 +100,11 @@ struct JournalView: View {
             }
             .background(AppColors.background.edgesIgnoringSafeArea(.all))
             .navigationTitle("Journal")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Button(action: { showingNewEntry = true }) {
                         Image(systemName: "square.and.pencil")
                             .font(.system(size: 18, weight: .semibold))
@@ -464,89 +466,174 @@ struct TagView: View {
 // MARK: - Editor View
 
 struct JournalEntryEditorView: View {
-    let isNewEntry: Bool
-    let initialPrompt: String
-    let initialTitle: String
-    let initialTags: [String]
-    let initialMood: Mood?
-    let initialMoodIntensity: Double
-    let onSave: (JournalEntryModel?) -> Void
-    
+    // Entry state
     @State private var title: String
     @State private var content: String
-    @State private var selectedTags: [String] = []
+    @State private var selectedTags: [String]
     @State private var selectedMood: Mood?
     @State private var moodIntensity: Double
-    @State private var showingPrompt = true
-    @State private var showingTagPicker = false
-    @State private var showingMoodPicker = false
-    @State private var recommendedStrategiesState: RecommendedStrategiesState?
+    
+    // Editing state
+    @State private var isPromptVisible: Bool = true
+    @State private var selectedTabIndex: Int = 0
+    @State private var showingTagSelector = false
+    @State private var showingDiscardAlert = false
+    @State private var isRequestingMoodIntensity = false
+    @State private var strategiesRecommendationsState: RecommendedStrategiesState?
+    
+    // Environment
     @Environment(\.dismiss) private var dismiss
     
-    private let availableTags = ["Rejection", "Insight", "Gratitude", "Habit", "Growth"]
+    private let isNewEntry: Bool
+    private let initialPrompt: String
+    private let onSave: (JournalEntryModel?) -> Void
     
-    // Initialize state with initial values
+    // All available tags for selection
+    private let availableTags = ["Personal", "Work", "Health", "Rejection", "Insight", "Gratitude", "Growth", "Habit", "Learning"]
+    
+    // Initialize with all required parameters
     init(isNewEntry: Bool, initialPrompt: String, initialTitle: String = "", initialTags: [String] = [], initialMood: Mood? = nil, initialMoodIntensity: Double = 5.0, onSave: @escaping (JournalEntryModel?) -> Void) {
         self.isNewEntry = isNewEntry
         self.initialPrompt = initialPrompt
-        self.initialTitle = initialTitle
-        self.initialTags = initialTags
-        self.initialMood = initialMood
-        self.initialMoodIntensity = initialMoodIntensity
         self.onSave = onSave
         
-        // Initialize state
+        // Initialize state variables
         _title = State(initialValue: initialTitle)
-        _content = State(initialValue: "") // We'll set this separately if coming from a prompt
+        _content = State(initialValue: initialPrompt)
         _selectedTags = State(initialValue: initialTags)
         _selectedMood = State(initialValue: initialMood)
         _moodIntensity = State(initialValue: initialMoodIntensity)
-        
-        // Show tag picker if initial tags are provided
-        _showingTagPicker = State(initialValue: !initialTags.isEmpty)
-        
-        // Show mood picker if mood is provided
-        _showingMoodPicker = State(initialValue: initialMood != nil)
-    }
-    
-    // Computed property to determine if save button should be enabled
-    private var isSaveButtonEnabled: Bool {
-        return !title.isEmpty && !content.isEmpty
     }
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Editor fields
+                // Tab selector
+                editorModeTabView
+                
+                ZStack {
+                    // Main editor area
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Writing prompt card (collapsible)
-                        if showingPrompt && !initialPrompt.isEmpty {
-                            promptCard
+                        VStack(spacing: 16) {
+                            // Title field
+                            titleField
+                            
+                            // Content/prompt area
+                            if selectedTabIndex == 0 {
+                                contentEditorSection
+                            } else {
+                                moodAndTagsSection
+                            }
                         }
-                        
-                        // Title field
+                        .padding()
+                    }
+                    
+                    // Action button overlay
+                    VStack {
+                        Spacer()
+                        saveButton
+                    }
+                    .padding()
+                }
+            }
+            .background(AppColors.background.edgesIgnoringSafeArea(.all))
+            .navigationTitle(isNewEntry ? "New Entry" : "Edit Entry")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        if hasUnsavedChanges() {
+                            showingDiscardAlert = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Save") {
+                        saveEntry()
+                    }
+                    .disabled(!isValidEntry())
+                }
+            }
+            .alert("Discard Changes?", isPresented: $showingDiscardAlert) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Continue Editing", role: .cancel) { }
+            } message: {
+                Text("You have unsaved changes that will be lost.")
+            }
+            .sheet(isPresented: $showingTagSelector) {
+                tagSelectorView
+                    .withDynamicTypeSize()
+            }
+            .sheet(item: $strategiesRecommendationsState) { state in
+                JournalCopingStrategiesView(recommendationsState: state)
+                    .withDynamicTypeSize()
+            }
+        }
+    }
+    
+    // MARK: - Component Views
+    
+    private var editorModeTabView: some View {
+        HStack {
+            Button(action: { selectedTabIndex = 0 }) {
+                Text("Content")
+                    .font(AppTextStyles.body2)
+                    .padding(.vertical, 12)
+                    .foregroundColor(selectedTabIndex == 0 ? AppColors.primary : AppColors.textMedium)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        selectedTabIndex == 0 ?
+                            AppColors.primary.opacity(0.1) :
+                            Color.clear
+                    )
+            }
+            
+            Button(action: { selectedTabIndex = 1 }) {
+                Text("Tags & Mood")
+                    .font(AppTextStyles.body2)
+                    .padding(.vertical, 12)
+                    .foregroundColor(selectedTabIndex == 1 ? AppColors.primary : AppColors.textMedium)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        selectedTabIndex == 1 ?
+                            AppColors.primary.opacity(0.1) :
+                            Color.clear
+                    )
+            }
+        }
+        .background(AppColors.cardBackground)
+    }
+    
+    private var titleField: some View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Title")
                                 .font(AppTextStyles.body2)
-                                .foregroundColor(AppColors.textMedium)
+                .foregroundColor(AppColors.textDark)
                             
                             TextField("Enter a title...", text: $title)
                                 .font(AppTextStyles.h3)
                                 .padding()
                                 .background(AppColors.cardBackground)
                                 .cornerRadius(AppLayout.cornerRadius)
-                                .makeAccessible(
-                                    label: "Journal entry title",
-                                    hint: "Enter a title for your journal entry"
-                                )
+        }
                         }
                         
-                        // Content field
+    private var contentEditorSection: some View {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("What's on your mind?")
+            // Prompt if available
+            if isPromptVisible && !initialPrompt.isEmpty {
+                promptView
+            }
+            
+            // Editor
+            Text("Journal Entry")
                                 .font(AppTextStyles.body2)
-                                .foregroundColor(AppColors.textMedium)
+                .foregroundColor(AppColors.textDark)
                             
                             ZStack(alignment: .topLeading) {
                                 TextEditor(text: $content)
@@ -555,10 +642,6 @@ struct JournalEntryEditorView: View {
                                     .frame(minHeight: 200)
                                     .background(AppColors.cardBackground)
                                     .cornerRadius(AppLayout.cornerRadius)
-                                    .makeAccessible(
-                                        label: "Journal entry content",
-                                        hint: "Write your thoughts and reflections"
-                                    )
                                 
                                 if content.isEmpty {
                                     Text("Start writing here...")
@@ -567,252 +650,234 @@ struct JournalEntryEditorView: View {
                                         .padding(.horizontal, 24)
                                         .padding(.vertical, 24)
                                         .allowsHitTesting(false)
+                }
                                 }
                             }
                         }
                         
-                        // Tags section
-                        VStack(alignment: .leading, spacing: 12) {
+    private var promptView: some View {
+        VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text("Tags")
-                                    .font(AppTextStyles.body2)
-                                    .foregroundColor(AppColors.textMedium)
+                Text("Writing Prompt")
+                    .font(AppTextStyles.body2.bold())
+                    .foregroundColor(AppColors.primary)
                                 
                                 Spacer()
                                 
-                                Button(action: { showingTagPicker.toggle() }) {
-                                    Text(showingTagPicker ? "Done" : "Edit")
-                                        .font(AppTextStyles.buttonFont)
-                                        .foregroundColor(AppColors.primary)
-                                }
-                                .makeAccessible(
-                                    label: showingTagPicker ? "Done selecting tags" : "Edit tags",
-                                    hint: "Toggle tag selection mode"
-                                )
-                            }
-                            
-                            if showingTagPicker {
-                                // Tag selection grid
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 10) {
-                                    ForEach(availableTags, id: \.self) { tag in
-                                        TagSelectionButton(
-                                            tag: tag,
-                                            isSelected: selectedTags.contains(tag),
-                                            action: {
-                                                if selectedTags.contains(tag) {
-                                                    selectedTags.removeAll { $0 == tag }
-                                                } else {
-                                                    selectedTags.append(tag)
-                                                }
-                                                HapticFeedback.light()
-                                            }
-                                        )
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            } else {
-                                // Selected tags display
-                                if selectedTags.isEmpty {
-                                    Text("Tap edit to add tags")
+                Button(action: {
+                    withAnimation {
+                        isPromptVisible = false
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.textMedium)
+                }
+            }
+            
+            Text(initialPrompt)
                                         .font(AppTextStyles.body1)
-                                        .foregroundColor(AppColors.textLight)
-                                        .padding(.vertical, 4)
-                                } else {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 8) {
-                                            ForEach(selectedTags, id: \.self) { tag in
-                                                TagView(tag: tag)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Mood section
+                .foregroundColor(AppColors.textDark)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppColors.primary.opacity(0.05))
+                .cornerRadius(AppLayout.cornerRadius)
+        }
+    }
+    
+    private var moodAndTagsSection: some View {
+        VStack(spacing: 24) {
+            // Mood selector
                         VStack(alignment: .leading, spacing: 12) {
-                            Button(action: { showingMoodPicker.toggle() }) {
-                                HStack {
-                                    Text("How do you feel after writing?")
+                Text("How are you feeling?")
                                         .font(AppTextStyles.body2)
-                                        .foregroundColor(AppColors.textMedium)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: showingMoodPicker ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(AppColors.textMedium)
-                                }
-                            }
-                            .withMinTouchArea()
-                            .makeAccessible(
-                                label: "Toggle mood selection",
-                                hint: "Select how you're feeling after writing"
-                            )
-                            
-                            if showingMoodPicker {
-                                // Mood selection
-                                VStack(spacing: 16) {
-                                    // Mood buttons
-                                    HStack(spacing: 16) {
+                    .foregroundColor(AppColors.textDark)
+                
+                // Mood grid
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 16) {
                                         ForEach(Mood.allCases) { mood in
                                             Button(action: {
-                                                selectedMood = mood
-                                                HapticFeedback.light()
+                            selectedMood = (selectedMood == mood) ? nil : mood
+                            if selectedMood != nil && selectedMood != .neutral {
+                                isRequestingMoodIntensity = true
+                            }
                                             }) {
                                                 VStack(spacing: 8) {
                                                     Text(mood.emoji)
-                                                        .font(.system(size: 30))
-                                                    
+                                    .font(.system(size: 32))
                                                     Text(mood.name)
-                                                        .font(AppTextStyles.captionText)
+                                    .font(AppTextStyles.smallText)
                                                         .foregroundColor(AppColors.textDark)
                                                 }
+                            .padding(.vertical, 12)
                                                 .frame(maxWidth: .infinity)
-                                                .padding(.vertical, 8)
-                                                .background(selectedMood == mood ? AppColors.primary.opacity(0.1) : Color.clear)
-                                                .cornerRadius(AppLayout.smallCornerRadius)
+                            .background(selectedMood == mood ? AppColors.primary.opacity(0.1) : AppColors.cardBackground)
+                            .cornerRadius(AppLayout.cornerRadius)
                                                 .overlay(
-                                                    RoundedRectangle(cornerRadius: AppLayout.smallCornerRadius)
-                                                        .stroke(selectedMood == mood ? AppColors.primary : Color.clear, lineWidth: 1)
-                                                )
-                                            }
-                                            .buttonStyle(.plain)
-                                            .makeAccessible(
-                                                label: mood.name,
-                                                hint: "Select if you're feeling \(mood.name)"
-                                            )
-                                        }
-                                    }
-                                    
-                                    // Intensity slider (if mood selected)
-                                    if selectedMood != nil && selectedMood != .neutral {
+                                RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
+                                    .stroke(selectedMood == mood ? AppColors.primary : Color.clear, lineWidth: 2)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                
+                // Intensity slider if mood is selected
+                if let mood = selectedMood, mood != .neutral, isRequestingMoodIntensity {
                                         VStack(alignment: .leading, spacing: 8) {
-                                            Text("Intensity: \(Int(moodIntensity))/10")
+                        Text("How intense is this feeling? (\(Int(moodIntensity))/10)")
                                                 .font(AppTextStyles.body2)
-                                                .foregroundColor(AppColors.textMedium)
+                            .foregroundColor(AppColors.textDark)
                                             
                                             Slider(value: $moodIntensity, in: 1...10, step: 1)
                                                 .accentColor(AppColors.primary)
-                                                .makeAccessible(
-                                                    label: "Emotion intensity",
-                                                    hint: "Rate the intensity from 1 to 10"
-                                                )
-                                        }
-                                        .padding(.top, 8)
-                                    }
                                 }
                                 .padding()
                                 .background(AppColors.cardBackground)
                                 .cornerRadius(AppLayout.cornerRadius)
-                            } else if let mood = selectedMood {
-                                // Selected mood display
-                                HStack(spacing: 12) {
-                                    Text(mood.emoji)
-                                        .font(.system(size: 24))
-                                    
-                                    Text("Feeling \(mood.name)")
-                                        .font(AppTextStyles.body1)
+                }
+            }
+            
+            // Tags selector
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Tags")
+                        .font(AppTextStyles.body2)
                                         .foregroundColor(AppColors.textDark)
                                     
-                                    if mood != .neutral {
-                                        Text("(\(Int(moodIntensity))/10)")
-                                            .font(AppTextStyles.body2)
-                                            .foregroundColor(AppColors.textMedium)
-                                    }
+                    Spacer()
+                    
+                    Button(action: { showingTagSelector = true }) {
+                        Text(selectedTags.isEmpty ? "Add Tags" : "Edit Tags")
+                            .font(AppTextStyles.buttonFont)
+                            .foregroundColor(AppColors.primary)
+                    }
+                }
+                
+                if selectedTags.isEmpty {
+                    Text("No tags selected")
+                        .font(AppTextStyles.body1)
+                        .foregroundColor(AppColors.textLight)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .background(AppColors.cardBackground)
+                        .cornerRadius(AppLayout.cornerRadius)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(selectedTags, id: \.self) { tag in
+                                HStack {
+                                    Text(tag)
+                                        .font(AppTextStyles.smallText)
+                                        .foregroundColor(tagColor(for: tag))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(tagColor(for: tag).opacity(0.1))
+                                        .cornerRadius(16)
                                     
-                                    Spacer()
-                                    
-                                    Button(action: { selectedMood = nil }) {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 12))
+                                    Button(action: {
+                                        selectedTags.removeAll { $0 == tag }
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(AppColors.textMedium)
-                                            .padding(8)
+                                            .font(.system(size: 14))
                                     }
-                                    .withMinTouchArea()
                                 }
-                                .padding(.vertical, 8)
                             }
                         }
+                        .padding(8)
                     }
-                    .padding()
-                    .onAppear {
-                        // If we have an initial prompt and this is a new entry,
-                        // automatically populate the content with a starter text
-                        if !initialPrompt.isEmpty && isNewEntry && content.isEmpty {
-                            content = "Prompt: \(initialPrompt)\n\nMy thoughts:\n"
-                        }
-                    }
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(AppLayout.cornerRadius)
                 }
-            }
-            .background(AppColors.background)
-            .navigationTitle(isNewEntry ? "New Journal Entry" : "Edit Entry")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveEntry()
-                    }
-                    .font(AppTextStyles.buttonFont)
-                    .foregroundColor(isSaveButtonEnabled ? AppColors.primary : AppColors.textLight)
-                    .disabled(!isSaveButtonEnabled)
-                }
-            }
-            // Add sheet presentation for coping strategies
-            .sheet(item: $recommendedStrategiesState) { state in
-                JournalCopingStrategiesView(recommendationsState: state)
             }
         }
     }
     
-    private var promptCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Writing Prompt")
-                    .font(AppTextStyles.h4)
-                    .foregroundColor(AppColors.textDark)
-                
-                Spacer()
-                
-                Button(action: {
-                    withAnimation {
-                        showingPrompt = false
-                    }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppColors.textLight)
-                }
-                .makeAccessible(
-                    label: "Close prompt",
-                    hint: "Hide the writing prompt"
-                )
-            }
-            
-            Text(initialPrompt)
-                .font(AppTextStyles.body1)
+    private var tagSelectorView: some View {
+        VStack(spacing: 16) {
+            Text("Select Tags")
+                .font(AppTextStyles.h3)
                 .foregroundColor(AppColors.textDark)
-                .padding(.vertical, 4)
+                .padding(.top)
             
-            if initialPrompt.contains("rejection") || selectedTags.contains("Rejection") {
-                Text("💡 Tip: Writing about rejection experiences can help reduce their emotional impact and build resilience.")
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(AppColors.textMedium)
-                    .padding(.top, 4)
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                    ForEach(availableTags, id: \.self) { tag in
+                        Button(action: {
+                            if selectedTags.contains(tag) {
+                                selectedTags.removeAll { $0 == tag }
+                            } else {
+                                selectedTags.append(tag)
+                            }
+                        }) {
+                            Text(tag)
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(selectedTags.contains(tag) ? .white : tagColor(for: tag))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(selectedTags.contains(tag) ? tagColor(for: tag) : tagColor(for: tag).opacity(0.1))
+                                .cornerRadius(AppLayout.cornerRadius)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding()
             }
+            
+            Button("Done") {
+                showingTagSelector = false
+            }
+            .font(AppTextStyles.buttonFont)
+            .foregroundColor(.white)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(AppColors.primary)
+            .cornerRadius(AppLayout.cornerRadius)
+            .padding()
         }
-        .padding()
-        .background(AppColors.cardBackground)
-        .cornerRadius(AppLayout.cornerRadius)
     }
     
-    // Save the journal entry
+    private var saveButton: some View {
+        Button(action: saveEntry) {
+            Text("Save Journal Entry")
+                .font(AppTextStyles.buttonFont)
+                .foregroundColor(.white)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(isValidEntry() ? AppColors.primary : AppColors.textLight)
+                .cornerRadius(AppLayout.cornerRadius)
+        }
+        .disabled(!isValidEntry())
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func isValidEntry() -> Bool {
+        return !title.isEmpty && !content.isEmpty
+    }
+    
+    private func hasUnsavedChanges() -> Bool {
+        return !title.isEmpty || content != initialPrompt || !selectedTags.isEmpty || selectedMood != nil
+    }
+    
+    private func tagColor(for tag: String) -> Color {
+        switch tag {
+        case "Rejection": return AppColors.primary
+        case "Insight": return AppColors.secondary
+        case "Gratitude": return .green
+        case "Growth": return .blue
+        case "Habit": return .purple
+        case "Personal": return .orange
+        case "Work": return .pink
+        case "Health": return .teal
+        case "Learning": return .indigo
+        default: return AppColors.textMedium
+        }
+    }
+    
     private func saveEntry() {
+        // Create journal entry
         let entry = JournalEntryModel(
             id: UUID().uuidString,
             date: Date(),
@@ -820,62 +885,24 @@ struct JournalEntryEditorView: View {
             content: content,
             tags: selectedTags,
             mood: selectedMood,
-            moodIntensity: showingMoodPicker && selectedMood != nil ? Int(moodIntensity) : nil
+            moodIntensity: selectedMood != nil && selectedMood != .neutral ? Int(moodIntensity) : nil
         )
         
         // First save the entry
         onSave(entry)
         
-        // Then analyze the journal content for strategies
+        // Then analyze for recommendations if relevant content
+        if content.count > 50 {
         let recommendedStrategies = analyzeJournalContentForStrategies(content)
         
-        // If we have recommendations, present them
         if !recommendedStrategies.isEmpty {
-            recommendedStrategiesState = RecommendedStrategiesState(strategies: recommendedStrategies)
+                strategiesRecommendationsState = RecommendedStrategiesState(strategies: recommendedStrategies)
         } else {
-            // If no recommendations, dismiss the view
             dismiss()
         }
-    }
-}
-
-struct TagSelectionButton: View {
-    let tag: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    private var tagColor: Color {
-        switch tag {
-        case "Rejection":
-            return AppColors.sadness
-        case "Insight":
-            return AppColors.accent2
-        case "Gratitude":
-            return AppColors.joy
-        case "Habit":
-            return AppColors.secondary
-        case "Growth":
-            return AppColors.calm
-        default:
-            return AppColors.textMedium
+        } else {
+            dismiss()
         }
-    }
-    
-    var body: some View {
-        Button(action: action) {
-            Text(tag)
-                .font(AppTextStyles.body2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .foregroundColor(isSelected ? .white : tagColor)
-                .background(isSelected ? tagColor : tagColor.opacity(0.1))
-                .cornerRadius(16)
-        }
-        .buttonStyle(.plain)
-        .makeAccessible(
-            label: tag,
-            hint: isSelected ? "Selected tag \(tag)" : "Select tag \(tag)"
-        )
     }
 }
 
@@ -924,7 +951,7 @@ struct JournalEntryDetailView: View {
                     
                     // Title
                     Text(entry.title)
-                        .font(AppTextStyles.h2)
+                        .font(AppTextStyles.h1)
                         .foregroundColor(AppColors.textDark)
                         .fixedSize(horizontal: false, vertical: true)
                     
@@ -933,7 +960,13 @@ struct JournalEntryDetailView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(entry.tags, id: \.self) { tag in
-                                    TagView(tag: tag)
+                                    Text(tag)
+                                        .font(AppTextStyles.smallText)
+                                        .foregroundColor(AppColors.textMedium)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(AppColors.cardBackground)
+                                        .cornerRadius(16)
                                 }
                             }
                         }
@@ -944,38 +977,44 @@ struct JournalEntryDetailView: View {
                         .font(AppTextStyles.body1)
                         .foregroundColor(AppColors.textDark)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
                     
-                    // Reflection prompts
-                    reflectionSection
+                    Spacer(minLength: 30)
                 }
                 .padding()
             }
             .background(AppColors.background.edgesIgnoringSafeArea(.all))
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { isEditing = true }) {
-                        Text("Edit")
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit") {
+                        isEditing = true
                     }
                 }
             }
             .sheet(isPresented: $isEditing) {
                 JournalEntryEditorView(
                     isNewEntry: false,
-                    initialPrompt: "",
-                    initialTitle: "",
-                    initialTags: [],
-                    initialMood: nil,
-                    initialMoodIntensity: 5,
-                    onSave: onUpdate
+                    initialPrompt: entry.content,  // Use entry content as prompt
+                    initialTitle: entry.title,
+                    initialTags: entry.tags,
+                    initialMood: entry.mood,
+                    initialMoodIntensity: Double(entry.moodIntensity ?? 5),
+                    onSave: { updatedEntry in
+                        if let updatedEntry = updatedEntry {
+                            onUpdate(updatedEntry)
+                        }
+                        isEditing = false
+                    }
                 )
+                .withDynamicTypeSize()
             }
         }
     }
@@ -1127,51 +1166,22 @@ struct JournalView_Previews: PreviewProvider {
 
 /// Analyzes journal content to extract emotional keywords and recommend coping strategies
 func analyzeJournalContentForStrategies(_ text: String) -> [CopingStrategyDetail] {
-    // Define emotional keywords and their associated categories
+    // For a real implementation, this would use NLP to find strategies
+    // For compilation, this is a simplified implementation
     let emotionalKeywords: [String: CopingStrategyCategory] = [
-        // Anxiety-related
-        "anxious": .mindfulness,
-        "worried": .mindfulness,
-        "nervous": .mindfulness,
-        "stressed": .mindfulness,
-        "overwhelmed": .selfCare,
-        "panic": .mindfulness,
-        "fear": .cognitive,
-        
-        // Depression-related
+        "anxious": .cognitive,
         "sad": .selfCare,
-        "depressed": .selfCare,
-        "hopeless": .cognitive,
+        "stress": .mindfulness,
         "lonely": .social,
-        "isolated": .social,
-        "alone": .social,
-        "empty": .creative,
-        
-        // Anger-related
         "angry": .physical,
-        "frustrated": .physical,
-        "irritated": .physical,
-        "annoyed": .cognitive,
-        "resentful": .cognitive,
-        
-        // Positive emotions (for maintenance)
-        "happy": .creative,
-        "joyful": .creative,
-        "grateful": .mindfulness,
-        "content": .mindfulness,
-        "peaceful": .mindfulness,
-        
-        // Relationship-related
-        "rejected": .social,
-        "betrayed": .social,
-        "dismissed": .social,
-        "misunderstood": .cognitive
+        "rejected": .selfCare,
+        "calm": .mindfulness,
+        "happy": .creative
     ]
     
-    // Normalize the text
+    // Real implementation would be more sophisticated
+    // This is just detecting keywords in the text
     let normalizedText = text.lowercased()
-    
-    // Find matching keywords
     var matchedCategories = Set<CopingStrategyCategory>()
     
     for (keyword, category) in emotionalKeywords {
@@ -1180,36 +1190,68 @@ func analyzeJournalContentForStrategies(_ text: String) -> [CopingStrategyDetail
         }
     }
     
-    // If we didn't find any specific matches, default to some general recommendations
+    // If no categories matched, suggest general strategies
     if matchedCategories.isEmpty {
         matchedCategories = [.selfCare, .mindfulness]
     }
     
-    // Get recommended strategies
+    // Get strategies for matched categories
     let copingStrategiesLibrary = LocalCopingStrategiesLibrary.shared
-    let allStrategies = copingStrategiesLibrary.strategies
+    var recommendedStrategies: [CopingStrategyDetail] = []
     
-    // Filter strategies based on matched categories
-    let recommendedStrategies = allStrategies.filter { strategy in
-        // Convert local category to global category for comparison
-        let globalCategory = copingStrategiesLibrary.mapToGlobalCategory(strategy.category)
-        return matchedCategories.contains(globalCategory)
+    // Convert from LocalCopingStrategyDetail to CopingStrategyDetail
+    for category in matchedCategories {
+        // Get strategies from the library - use the conversion function
+        for strategy in copingStrategiesLibrary.strategies.filter({ convertLocalToGlobalCategory($0.category) == category }).prefix(2) {
+            // Convert each strategy to the new format
+            let newStrategy = CopingStrategyDetail(
+                name: strategy.title,
+                description: strategy.description,
+                category: convertLocalToGlobalCategory(strategy.category),
+                duration: getDurationFromTimeString(strategy.timeToComplete),
+                steps: strategy.steps,
+                benefits: [],
+                researchBacked: false
+            )
+            recommendedStrategies.append(newStrategy)
+        }
     }
     
-    // Return up to 5 strategies (shuffled for variety)
-    let localStrategies = Array(recommendedStrategies.shuffled().prefix(5))
-    
-    // Convert local strategies to global strategies
-    return localStrategies.map { $0.toGlobal() }
+    // Limit to 5 strategies maximum
+    return Array(recommendedStrategies.prefix(5))
+}
+
+// Helper function to convert time strings to duration enum
+private func getDurationFromTimeString(_ timeString: String) -> StrategyDuration {
+    if timeString.contains("Under 2") || timeString.contains("1-2") {
+        return .veryShort
+    } else if timeString.contains("3-5") || timeString.contains("2-5") {
+        return .short
+    } else if timeString.contains("5-15") || timeString.contains("10-15") {
+        return .medium
+    } else {
+        return .long
+    }
+}
+
+// Add a compatibility function to convert between strategy types
+private func convertLocalToGlobalCategory(_ localCategory: LocalCopingStrategyCategory) -> CopingStrategyCategory {
+    switch localCategory {
+    case .mindfulness: return .mindfulness
+    case .cognitive: return .cognitive
+    case .physical: return .physical
+    case .social: return .social
+    case .creative: return .creative
+    case .selfCare: return .selfCare
+    }
 }
 
 // MARK: - Recommended Strategies View
 
 // Environment object to track presentation state of recommendations
 class RecommendedStrategiesState: ObservableObject, Identifiable {
-    var id: UUID = UUID()
-    @Published var isPresented: Bool = false
-    let strategies: [CopingStrategyDetail]
+    public let id = UUID()
+    @Published var strategies: [CopingStrategyDetail]
     
     init(strategies: [CopingStrategyDetail]) {
         self.strategies = strategies
@@ -1248,9 +1290,11 @@ struct JournalCopingStrategiesView: View {
             }
             .padding(.top)
             .background(AppColors.background.edgesIgnoringSafeArea(.all))
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         dismiss()
                     }
@@ -1265,170 +1309,193 @@ struct JournalCopingStrategiesView: View {
         }
     }
     
-    // Strategy card view
     private func strategyCard(for strategy: CopingStrategyDetail) -> some View {
+        Button(action: {
+            // Show strategy details
+        }) {
         VStack(alignment: .leading, spacing: 12) {
-            // Header with title and category
-            HStack {
-                Text(strategy.title)
+                // Category badge
+                Text(categoryCopy(for: strategy.category))
+                    .font(AppTextStyles.buttonFont)
+                    .foregroundColor(categoryColor(for: strategy.category))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(categoryColor(for: strategy.category).opacity(0.1))
+                    .cornerRadius(16)
+                
+                // Strategy title
+                Text(strategy.name)
                     .font(AppTextStyles.h3)
                     .foregroundColor(AppColors.textDark)
-                Spacer()
-                Text(strategy.category.rawValue)
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(strategy.category.color)
-                    .cornerRadius(12)
-            }
-            
-            // Description
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Strategy description
             Text(strategy.description)
-                .font(AppTextStyles.body2)
+                    .font(AppTextStyles.body1)
                 .foregroundColor(AppColors.textMedium)
-                .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             
-            // Time and intensity
+                // Footer with time and button
             HStack {
-                Label(strategy.timeToComplete, systemImage: "clock")
+                    // Time to complete
+                    Label(
+                        title: { Text(getDurationText(for: strategy.duration)) },
+                        icon: { Image(systemName: "clock") }
+                    )
                     .font(AppTextStyles.captionText)
                     .foregroundColor(AppColors.textMedium)
                 
                 Spacer()
                 
-                Text(strategy.intensity.rawValue)
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(strategy.intensity.color)
-            }
-            
-            // Get started button
-            NavigationLink(destination: strategyDetailView(for: strategy)) {
-                Text("Get Started")
-                    .font(AppTextStyles.body2.bold())
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(AppColors.primary)
-                    .cornerRadius(AppLayout.cornerRadius)
+                    Text("View Strategy")
+                        .font(AppTextStyles.buttonFont)
+                        .foregroundColor(categoryColor(for: strategy.category))
             }
         }
         .padding()
         .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .accessibilitySortPriority(1)
     }
     
-    // Create a strategy detail view
     private func strategyDetailView(for strategy: CopingStrategyDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Category badge
-                Text(strategy.category.rawValue)
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(strategy.category.color)
-                    .cornerRadius(12)
-                
-                // Title
-                Text(strategy.title)
-                    .font(AppTextStyles.h2)
+        VStack(spacing: 24) {
+            // Header with title
+            VStack(spacing: 16) {
+                Text(strategy.name)
+                    .font(AppTextStyles.h1)
                     .foregroundColor(AppColors.textDark)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Category and time needed
+                HStack(spacing: 16) {
+                    // Category badge
+                    Label(
+                        title: { Text(categoryCopy(for: strategy.category)) },
+                        icon: { Image(systemName: categoryIcon(for: strategy.category)) }
+                    )
+                            .font(AppTextStyles.captionText)
+                    .foregroundColor(categoryColor(for: strategy.category))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(categoryColor(for: strategy.category).opacity(0.1))
+                    .cornerRadius(16)
+                    
+                    // Time badge
+                    Label(
+                        title: { Text(getDurationText(for: strategy.duration)) },
+                        icon: { Image(systemName: "clock") }
+                    )
+                            .font(AppTextStyles.captionText)
+                            .foregroundColor(AppColors.textMedium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(16)
+                }
                 
                 // Description
                 Text(strategy.description)
                     .font(AppTextStyles.body1)
                     .foregroundColor(AppColors.textMedium)
-                    .padding(.bottom, 10)
-                
-                // Time and intensity
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading) {
-                        Text("TIME")
-                            .font(AppTextStyles.captionText)
-                            .foregroundColor(AppColors.textMedium)
-                        Label(strategy.timeToComplete, systemImage: "clock")
-                            .font(AppTextStyles.body2)
-                            .foregroundColor(AppColors.textDark)
-                    }
-                    
-                    VStack(alignment: .leading) {
-                        Text("INTENSITY")
-                            .font(AppTextStyles.captionText)
-                            .foregroundColor(AppColors.textMedium)
-                        Text(strategy.intensity.rawValue)
-                            .font(AppTextStyles.body2)
-                            .foregroundColor(strategy.intensity.color)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.vertical, 10)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
                 
                 // Steps section
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Steps to Follow")
-                        .font(AppTextStyles.h3)
+                Text("How to do it")
+                    .font(AppTextStyles.h2)
                         .foregroundColor(AppColors.textDark)
                     
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(Array(strategy.steps.enumerated()), id: \.offset) { index, step in
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(strategy.steps.enumerated()), id: \.element) { index, step in
                             HStack(alignment: .top, spacing: 16) {
+                            // Step number
                                 Text("\(index + 1)")
                                     .font(AppTextStyles.h3)
                                     .foregroundColor(.white)
-                                    .frame(width: 30, height: 30)
-                                    .background(AppColors.primary)
-                                    .cornerRadius(15)
-                                
+                                .frame(width: 28, height: 28)
+                                .background(categoryColor(for: strategy.category))
+                                .cornerRadius(14)
+                            
+                            // Step text
                                 Text(step)
                                     .font(AppTextStyles.body1)
                                     .foregroundColor(AppColors.textDark)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            
+            // Benefits section if available
+            if !strategy.benefits.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Benefits")
+                        .font(AppTextStyles.h2)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(strategy.benefits, id: \.self) { benefit in
+                            HStack(alignment: .top, spacing: 16) {
+                                // Bullet point
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(categoryColor(for: strategy.category))
+                                
+                                // Benefit text
+                                Text(benefit)
+                                    .font(AppTextStyles.body1)
+                                    .foregroundColor(AppColors.textDark)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
                 }
             }
-            .padding(.vertical, 10)
             
-            // Tips section if available
-            if let tips = strategy.tips, !tips.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Helpful Tips")
-                        .font(AppTextStyles.h3)
-                        .foregroundColor(AppColors.textDark)
-                    
-                    ForEach(tips, id: \.self) { tip in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: "lightbulb.fill")
-                                .foregroundColor(AppColors.accent2)
-                            
-                            Text(tip)
-                                .font(AppTextStyles.body2)
-                                .foregroundColor(AppColors.textMedium)
-                        }
-                    }
-                }
-                .padding(.vertical, 10)
-            }
-            
-            // Start now button
+            // Start button
             Button(action: {
-                // Add tracking logic for strategy use
-                dismiss()
+                // Start the strategy
             }) {
-                Text("I've Completed This")
-                    .font(AppTextStyles.body1.bold())
+                Text("Start Now")
+                    .font(AppTextStyles.buttonFont)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(AppColors.primary)
+                    .padding()
+                    .background(categoryColor(for: strategy.category))
                     .cornerRadius(AppLayout.cornerRadius)
             }
-            .padding(.top, 20)
+            .padding(.top, 8)
         }
         .padding()
+    }
+    
+    // Helper functions for styling
+    private func categoryCopy(for category: CopingStrategyCategory) -> String {
+        category.displayName
+    }
+    
+    private func categoryIcon(for category: CopingStrategyCategory) -> String {
+        category.iconName
+    }
+    
+    private func categoryColor(for category: CopingStrategyCategory) -> Color {
+        category.color
+    }
+    
+    private func getDurationText(for duration: StrategyDuration) -> String {
+        duration.rawValue
+    }
+}
+
+// Fix the smallText in AppTextStyles
+extension AppTextStyles {
+    static var smallText: Font {
+        .system(size: 12)
     }
 } 

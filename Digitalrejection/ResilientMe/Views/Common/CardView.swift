@@ -1,4 +1,5 @@
 import SwiftUI
+import ResilientMe
 
 /// A reusable card component for consistent styling across the app
 struct CardView<Content: View>: View {

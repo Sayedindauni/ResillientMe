@@ -7,6 +7,10 @@
 
 import Foundation
 import SwiftUI
+// Add specific import for the EngineCopingStrategyCategory
+import ResilientMe
+// Remove the ResilientMe import to avoid circular reference
+// import ResilientMe
 
 // MARK: - AppModels namespace to avoid conflicts
 // This only contains the data models, not the styles
@@ -107,7 +111,8 @@ public struct CopingResource: Identifiable {
 
 // MARK: - App Resource Types
 
-enum AppResourceType: String, Codable, CaseIterable, Identifiable {
+// Resource types for the app
+public enum AppResourceType: String, CaseIterable, Identifiable {
     case article = "Article"
     case video = "Video"
     case audio = "Audio"
@@ -115,297 +120,339 @@ enum AppResourceType: String, Codable, CaseIterable, Identifiable {
     case book = "Book"
     case exercise = "Exercise"
     
-    var id: String { rawValue }
+    public var id: String { rawValue }
     
-    var iconName: String {
+    public var iconName: String {
         switch self {
         case .article: return "doc.text"
-        case .video: return "play.rectangle"
+        case .video: return "play.rectangle.fill"
         case .audio: return "headphones"
         case .app: return "iphone"
-        case .book: return "book"
-        case .exercise: return "figure.mind.and.body"
+        case .book: return "book.fill"
+        case .exercise: return "figure.walk"
         }
     }
     
-    var color: Color {
+    public var color: Color {
         switch self {
-        case .article: return Color(AppColors.primary) // Blue
-        case .video: return Color(AppColors.accent1)   // Soft peach
-        case .audio: return Color(AppColors.accent2)   // Lavender
-        case .app: return Color(AppColors.secondary)   // Sage green
-        case .book: return Color(AppColors.accent3)    // Powder blue
-        case .exercise: return Color(AppColors.calm)   // Calm blue
+        case .article: return .blue // Use standard SwiftUI Color
+        case .video: return .orange   
+        case .audio: return .purple   
+        case .app: return .green  
+        case .book: return .indigo    
+        case .exercise: return .blue   
         }
     }
 }
 
 // MARK: - Coping Strategy Categories
 
-public enum AppCopingStrategyCategory: String, CaseIterable, Identifiable {
-    case mindfulness = "Mindfulness"
-    case cognitive = "Cognitive"
-    case physical = "Physical"
-    case social = "Social"
-    case creative = "Creative"
-    case selfCare = "Self-Care"
-    
-    public var id: String { rawValue }
-    
-    public var iconName: String {
-        switch self {
-        case .mindfulness: return "brain.head.profile"
-        case .cognitive: return "lightbulb"
-        case .physical: return "figure.walk"
-        case .social: return "person.2"
-        case .creative: return "paintpalette"
-        case .selfCare: return "heart.fill"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .mindfulness: return Color(AppColors.calm)
-        case .cognitive: return Color(AppColors.primary)
-        case .physical: return Color(red: 0.2, green: 0.8, blue: 0.4)
-        case .social: return Color(red: 0.6, green: 0.4, blue: 0.8)
-        case .creative: return Color(red: 0.9, green: 0.3, blue: 0.5)
-        case .selfCare: return Color(red: 0.9, green: 0.4, blue: 0.4)
-        }
-    }
-}
+// These type aliases were causing ambiguity - removing them
+// public typealias ExportCopingStrategyCategory = LocalCopingStrategyCategory
+// public typealias ExportCopingStrategyDetail = LocalCopingStrategyDetail  
+// public typealias ExportCopingStrategiesLibrary = LocalCopingStrategiesLibrary
 
-// MARK: - Coping Strategy Detail
+// Use the #if compiler directive to prevent duplicate definitions
+// Define USE_COPING_TYPES to indicate we're using types from CopingTypes.swift
+// #define USE_COPING_TYPES 1
 
-public struct AppCopingStrategyDetail: Identifiable {
-    public let id: String
+#if !LIBRARY_MODULE && !USE_COPING_TYPES
+// Local versions for the implementation
+// These would normally be in the library module
+// public enum LocalCopingStrategyCategory: String, CaseIterable, Identifiable {
+//     case mindfulness = "Mindfulness"
+//     case cognitive = "Cognitive"
+//     case physical = "Physical"
+//     case social = "Social"
+//     case creative = "Creative"
+//     case selfCare = "Self-Care"
+//     
+//     public var id: String { rawValue }
+//     
+//     public var iconName: String {
+//         switch self {
+//         case .mindfulness: return "brain.head.profile"
+//         case .cognitive: return "lightbulb"
+//         case .physical: return "figure.walk"
+//         case .social: return "person.2"
+//         case .creative: return "paintpalette"
+//         case .selfCare: return "heart.fill"
+//         }
+//     }
+//     
+//     public var color: Color {
+//         switch self {
+//         case .mindfulness: return .blue
+//         case .cognitive: return .blue
+//         case .physical: return .green
+//         case .social: return .purple
+//         case .creative: return .orange
+//         case .selfCare: return .pink
+//         }
+//     }
+// }
+
+// Use type from CopingTypes.swift instead
+// Using typealias defined in CopingTypes.swift
+// public typealias LocalCopingStrategyCategory = ResilientMe.EngineCopingStrategyCategory
+
+// Add a typealias to resolve the naming issue
+public typealias LocalCopingStrategyCategory = EngineCopingStrategyCategory
+
+// The actual coping strategy detail type
+public struct LocalCopingStrategyDetail: Identifiable, Hashable {
+    public let id: UUID
     public let title: String
     public let description: String
-    public let category: AppCopingStrategyCategory
+    // Using the typealias for EngineModels.StrategyCategory
+    public let category: LocalCopingStrategyCategory
     public let timeToComplete: String
+    public let difficultyLevel: String
     public let steps: [String]
-    public let intensity: StrategyIntensity
-    public let moodTargets: [String]
+    public let source: String
+    public let tags: [String]
     
-    // Optional additional fields
-    public var tips: [String]?
-    public var resources: [String]?
+    public init(id: UUID = UUID(), title: String, description: String, category: LocalCopingStrategyCategory, timeToComplete: String, difficultyLevel: String = "Beginner", steps: [String], source: String = "ResilientMe", tags: [String] = []) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.category = category
+        self.timeToComplete = timeToComplete
+        self.difficultyLevel = difficultyLevel
+        self.steps = steps
+        self.source = source
+        self.tags = tags
+    }
     
-    // Enum for strategy intensity
-    public enum StrategyIntensity: String, Codable {
-        case quick = "Quick"
-        case moderate = "Moderate"
-        case intensive = "Intensive"
-        
-        public var color: Color {
-            switch self {
-            case .quick: return Color.green
-            case .moderate: return Color.blue
-            case .intensive: return Color.purple
-            }
-        }
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: LocalCopingStrategyDetail, rhs: LocalCopingStrategyDetail) -> Bool {
+        lhs.id == rhs.id
     }
 }
 
-// MARK: - Coping Strategies Library
-
-public class AppCopingStrategiesLibrary {
-    // Singleton instance
-    public static let shared = AppCopingStrategiesLibrary()
+// Coping strategies library for accessing strategies
+public class LocalCopingStrategiesLibrary {
+    public static let shared = LocalCopingStrategiesLibrary()
     
-    // All available strategies
-    public var strategies: [AppCopingStrategyDetail] = []
+    public var strategies: [LocalCopingStrategyDetail] = []
     
-    // Private initializer for singleton
     private init() {
         loadStrategies()
     }
     
-    // Get strategies for a specific category
-    public func getStrategies(for category: AppCopingStrategyCategory) -> [AppCopingStrategyDetail] {
+    private func loadStrategies() {
+        // Load built-in strategies
+        strategies = LocalCopingStrategiesLibrary.defaultStrategies
+    }
+    
+    public func getStrategies(for category: LocalCopingStrategyCategory) -> [LocalCopingStrategyDetail] {
         return strategies.filter { $0.category == category }
     }
     
-    // Recommend strategies based on mood and trigger
-    public func recommendStrategies(for mood: String, intensity: Int, trigger: String? = nil) -> [AppCopingStrategyDetail] {
-        // In a real app, this would have complex logic
-        // For now, return a filtered subset based on mood type
+    public func recommendStrategies(for mood: String, intensity: Int, trigger: String? = nil) -> [LocalCopingStrategyDetail] {
+        // Simple implementation that recommends strategies based on mood
         
-        let isNegativeMood = ["sad", "angry", "frustrated", "anxious", "stressed"]
-            .contains(where: { mood.lowercased().contains($0) })
-        
-        if isNegativeMood {
-            // For negative moods, return strategies that help with calming
-            return strategies.filter { 
-                $0.category == .mindfulness || $0.category == .selfCare 
-            }
-        } else {
-            // For positive/neutral moods, return general strategies
-            return Array(strategies.prefix(5))
+        // For high intensity emotions, prioritize grounding and mindfulness
+        if intensity >= 4 {
+            let mindfulnessStrategies = getStrategies(for: .mindfulness).prefix(2)
+            let cognitiveStrategies = getStrategies(for: .cognitive).prefix(1)
+            return Array(mindfulnessStrategies) + Array(cognitiveStrategies)
         }
+        
+        // For rejection-related moods, prioritize self-compassion and social support
+        if mood.lowercased().contains("reject") || mood.lowercased().contains("disappoint") {
+            let selfCareStrategies = getStrategies(for: .selfCare).prefix(2)
+            let socialStrategies = getStrategies(for: .social).prefix(1)
+            return Array(selfCareStrategies) + Array(socialStrategies)
+        }
+        
+        // Default case: mix of strategies
+        var recommendations: [LocalCopingStrategyDetail] = []
+        for category in LocalCopingStrategyCategory.allCases {
+            if let strategy = getStrategies(for: category).first {
+                recommendations.append(strategy)
+            }
+            if recommendations.count >= 3 {
+                break
+            }
+        }
+        
+        return recommendations
     }
     
-    // Convert detailed strategies to simple strings (for backward compatibility)
-    public static func getSimpleStrategyStrings(from strategies: [AppCopingStrategyDetail]) -> [String] {
+    // Helper to convert strategy objects to simple strings for older interfaces
+    public static func getSimpleStrategyStrings(from strategies: [LocalCopingStrategyDetail]) -> [String] {
         return strategies.map { $0.title }
     }
     
-    // Load strategies from data
-    private func loadStrategies() {
-        // In a real app, these might come from a database or API
-        // For now, we'll create some samples
-        
-        strategies = [
-            // Mindfulness strategies
-            AppCopingStrategyDetail(
-                id: "mind1",
-                title: "5-Minute Breathing Exercise",
-                description: "A quick breathing technique to center yourself and reduce immediate stress.",
+    // Default strategies for the app
+    static let defaultStrategies: [LocalCopingStrategyDetail] = [
+        // Mindfulness strategies
+        LocalCopingStrategyDetail(
+                title: "5-4-3-2-1 Grounding Technique",
+            description: "A mindfulness exercise to reconnect with your surroundings when experiencing rejection anxiety.",
                 category: .mindfulness,
-                timeToComplete: "5 min",
+            timeToComplete: "5 minutes",
                 steps: [
-                    "Find a comfortable seated position",
-                    "Close your eyes and take a deep breath",
-                    "Breathe in for 4 counts, hold for 2, exhale for 6",
-                    "Focus on your breath and let thoughts pass by",
-                    "Continue for 5 minutes"
-                ],
-                intensity: .quick,
-                moodTargets: ["joyful", "content", "neutral"],
-                tips: ["Try counting your breaths", "If your mind wanders, gently bring it back to your breath"]
-            ),
-            
-            // Cognitive strategies
-            AppCopingStrategyDetail(
-                id: "cog1",
-                title: "Thought Challenging",
-                description: "Identify and reframe negative thought patterns to more balanced perspectives.",
+                "Find a comfortable position and take a deep breath",
+                "Name 5 things you can see",
+                "Name 4 things you can feel",
+                "Name 3 things you can hear",
+                "Name 2 things you can smell",
+                "Name 1 thing you can taste",
+                "Take another deep breath and notice how you feel"
+            ],
+            tags: ["anxiety", "rejection", "grounding", "quick"]
+        ),
+        
+        LocalCopingStrategyDetail(
+            title: "Mindful Self-Compassion Break",
+            description: "A brief practice to respond to rejection with kindness rather than self-criticism.",
+                category: .mindfulness,
+            timeToComplete: "3-5 minutes",
+                steps: [
+                "Place your hands over your heart or another soothing place",
+                "Acknowledge your feelings: 'This is a moment of suffering'",
+                "Recognize our shared humanity: 'Rejection is something many people experience'",
+                "Offer yourself kindness: 'May I be kind to myself in this moment'",
+                "Ask: 'What do I need right now?'",
+                "Give yourself permission to meet that need"
+            ],
+            tags: ["rejection", "self-compassion", "quick"]
+        ),
+        
+        // Cognitive strategies
+        LocalCopingStrategyDetail(
+            title: "Thought Record for Rejection",
+            description: "Examine and reframe negative thoughts following a rejection experience.",
                 category: .cognitive,
-                timeToComplete: "15 min",
+            timeToComplete: "10-15 minutes",
+            difficultyLevel: "Intermediate",
                 steps: [
-                    "Identify the negative thought",
-                    "Write down evidence for and against this thought",
-                    "Consider alternative explanations",
-                    "Create a more balanced perspective",
-                    "Practice your new thought"
-                ],
-                intensity: .moderate,
-                moodTargets: ["sad", "frustrated", "stressed"],
-                tips: ["Write down evidence for and against the thought", "Consider alternative explanations"]
-            ),
-            
-            // Physical strategies
-            AppCopingStrategyDetail(
-                id: "phys1",
-                title: "Quick Stretch Routine",
-                description: "A series of simple stretches to release physical tension.",
+                "Write down the situation where you experienced rejection",
+                "Note your automatic thoughts and how strongly you believe them (0-100%)",
+                "Identify the emotions these thoughts triggered and their intensity (0-100%)",
+                "List evidence that supports these thoughts",
+                "List evidence that contradicts these thoughts",
+                "Create a balanced alternative thought",
+                "Rate how strongly you believe this new thought (0-100%)",
+                "Note how your emotions change with this new perspective"
+            ],
+            tags: ["rejection", "cognitive restructuring", "journaling"]
+        ),
+        
+        LocalCopingStrategyDetail(
+            title: "Values Reconnection",
+            description: "Reconnect with your core values to find meaning beyond rejection.",
+                category: .cognitive,
+            timeToComplete: "5-10 minutes",
+                steps: [
+                "List 3-5 personal values that are most important to you",
+                "For each value, note why it matters to you",
+                "Consider how this rejection experience connects to your values",
+                "Identify one small action aligned with your values that you can take today",
+                "Commit to taking that action regardless of feelings of rejection"
+            ],
+            tags: ["values", "meaning", "purpose"]
+        ),
+        
+        // Physical strategies
+        LocalCopingStrategyDetail(
+            title: "Release Tension Walk",
+            description: "A walking technique to release physical tension associated with rejection feelings.",
                 category: .physical,
-                timeToComplete: "10 min",
+            timeToComplete: "15-20 minutes",
                 steps: [
-                    "Stretch arms above head for 15 seconds",
-                    "Roll shoulders backward and forward",
-                    "Gentle neck stretches side to side",
-                    "Forward fold to stretch hamstrings",
-                    "Finish with gentle twists"
-                ],
-                intensity: .quick,
-                moodTargets: ["joyful", "content", "neutral"],
-                tips: ["Stretch slowly and focus on your breath"]
-            ),
-            
-            // Add a few more examples for other categories
-            AppCopingStrategyDetail(
-                id: "soc1",
-                title: "Reach Out Exercise",
-                description: "Structured approach to connecting with a supportive person.",
+                "Find a safe place to walk (outdoors if possible)",
+                "Begin walking at a comfortable pace",
+                "Scan your body for areas of tension",
+                "With each step, imagine sending breath to tense areas",
+                "As you exhale, visualize tension flowing out through your feet into the ground",
+                "If thoughts of rejection arise, acknowledge them without judgment",
+                "Return focus to your breathing and walking",
+                "End with three deep breaths and notice how your body feels"
+            ],
+            tags: ["tension", "walking", "outdoors", "breathing"]
+        ),
+        
+        // Social strategies
+        LocalCopingStrategyDetail(
+            title: "Supportive Connection Script",
+            description: "A guided approach to reaching out for support after rejection.",
                 category: .social,
-                timeToComplete: "Varies",
+            timeToComplete: "Varies",
                 steps: [
-                    "Identify someone you trust",
-                    "Decide what you're comfortable sharing",
-                    "Make contact via text, call, or in person",
-                    "Share your feelings",
-                    "Listen to their perspective"
-                ],
-                intensity: .moderate,
-                moodTargets: ["joyful", "content", "neutral"],
-                tips: ["Choose a supportive person to share with", "Listen actively and empathetically"]
-            )
-        ]
+                "Identify a trusted person who has been supportive in the past",
+                "Decide what kind of support you need: listening, perspective, distraction, etc.",
+                "Practice what you might say: 'I experienced a rejection and could use [specific support]'",
+                "Set boundaries for the conversation if needed",
+                "Reach out in a way that feels comfortable",
+                "Express gratitude for their support afterwards"
+            ],
+            tags: ["social support", "communication", "vulnerability"]
+        ),
+        
+        // Creative strategies
+        LocalCopingStrategyDetail(
+            title: "Rejection Transformation Art",
+            description: "Transform feelings of rejection into creative expression.",
+                category: .creative,
+            timeToComplete: "30+ minutes",
+                steps: [
+                "Choose any creative medium you enjoy (drawing, writing, music, etc.)",
+                "Set a timer for 5 minutes and express your rejection feelings without judgment",
+                "Take a short break and reflect",
+                "Now create something that transforms or responds to these feelings",
+                "This could be a hopeful ending, a lesson learned, or simply a different perspective",
+                "Title your creation and consider what it taught you"
+            ],
+            tags: ["art therapy", "expression", "transformation"]
+        ),
+        
+        // Self-care strategies
+        LocalCopingStrategyDetail(
+            title: "Rejection Resilience Care Package",
+            description: "Create a personalized self-care package to use after rejection experiences.",
+                category: .selfCare,
+            timeToComplete: "20 minutes to create, then ongoing",
+                steps: [
+                "Find a container (box, basket, digital list) for your care package",
+                "Include items that engage your senses (soft fabric, calming scent, etc.)",
+                    "Add reminders of your strengths and past successes",
+                "Include contact info for supportive people",
+                "Add activities that reliably improve your mood",
+                "Write a compassionate note to your future self",
+                "Use the care package when experiencing rejection"
+            ],
+            tags: ["preparation", "self-care", "comfort"]
+        )
+    ]
+}
+
+// MARK: - Journal Prompts
+
+public enum AppMoodIntensity: Int, CaseIterable {
+    case veryLow = 1
+    case low = 2
+    case moderate = 3
+    case high = 4
+    case veryHigh = 5
+    
+    public var description: String {
+        switch self {
+        case .veryLow: return "Very Mild"
+        case .low: return "Mild"
+        case .moderate: return "Moderate"
+        case .high: return "Strong"
+        case .veryHigh: return "Very Strong"
+        }
     }
 }
 
-// MARK: - Coping Strategies
+// MARK: - Model Type Aliases (for backward compatibility)
 
-struct CopingStrategies {
-    // Simple method to recommend strategies based on mood and trigger
-    static func recommendFor(mood: String, trigger: String? = nil) -> [String] {
-        // Simple recommendation logic based on mood type
-        var recommendations: [String] = []
-        
-        let moodLower = mood.lowercased()
-        
-        // Add general recommendations
-        recommendations.append("Take 5 deep breaths")
-        recommendations.append("Go for a short walk")
-        
-        // Add mood-specific recommendations
-        if ["sad", "down", "depressed", "blue", "gloomy"]
-             .contains(where: { moodLower.contains($0) }) {
-            recommendations.append("Call a friend who makes you laugh")
-            recommendations.append("Watch something uplifting")
-            recommendations.append("Listen to upbeat music")
-        } 
-        else if ["anxious", "worried", "nervous", "stressed", "overwhelmed"]
-                 .contains(where: { moodLower.contains($0) }) {
-            recommendations.append("Progressive muscle relaxation")
-            recommendations.append("Write down your worries")
-            recommendations.append("Focus on what you can control")
-        }
-        else if ["angry", "frustrated", "irritated", "annoyed"]
-                 .contains(where: { moodLower.contains($0) }) {
-            recommendations.append("Count to 10 before responding")
-            recommendations.append("Physical exercise to release tension")
-            recommendations.append("Write about what's bothering you")
-        }
-        else if ["happy", "joyful", "excited", "content"]
-                 .contains(where: { moodLower.contains($0) }) {
-            recommendations.append("Journal about what's going well")
-            recommendations.append("Share your happiness with someone")
-            recommendations.append("Engage in a creative activity")
-        }
-        
-        // Add trigger-specific recommendations
-        if let trigger = trigger {
-            let triggerLower = trigger.lowercased()
-            
-            if ["rejection", "social"]
-                .contains(where: { triggerLower.contains($0) }) {
-                recommendations.append("Remember past social successes")
-                recommendations.append("Practice self-compassion")
-                recommendations.append("Reach out to a supportive friend")
-            }
-            else if ["work", "professional", "job"]
-                    .contains(where: { triggerLower.contains($0) }) {
-                recommendations.append("Break tasks into smaller steps")
-                recommendations.append("Take a short break")
-                recommendations.append("List your accomplishments")
-            }
-            else if ["relationship", "romantic", "partner"]
-                    .contains(where: { triggerLower.contains($0) }) {
-                recommendations.append("Focus on what you can control")
-                recommendations.append("Practice open communication")
-                recommendations.append("Take time for self-care")
-            }
-        }
-        
-        // Return top 5 recommendations
-        return Array(Set(recommendations)).shuffled().prefix(5).map { $0 }
-    }
-}
-
-// MARK: - Type Aliases for Backward Compatibility
-
-// These aliases help existing code reference the new type names
-public typealias CopingStrategyCategory = AppCopingStrategyCategory
-public typealias CopingStrategyDetail = AppCopingStrategyDetail
+// These should match the types defined in AppThemeBridge.swift
+#endif

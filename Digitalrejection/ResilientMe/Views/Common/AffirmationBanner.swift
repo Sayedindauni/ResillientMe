@@ -11,8 +11,8 @@ struct AffirmationBanner: View {
                 VStack(spacing: 8) {
                     HStack {
                         Text("Today's Affirmation")
-                            .font(AppTextStyles.h4)
-                            .foregroundColor(AppColors.textDark)
+                            .font(.headline)
+                            .foregroundColor(.primary)
                         
                         Spacer()
                         
@@ -20,18 +20,18 @@ struct AffirmationBanner: View {
                             withAnimation(.easeInOut) {
                                 isExpanded = false
                             }
-                            HapticFeedback.light()
+                            // Haptic feedback would go here
                         }) {
                             Image(systemName: "chevron.up")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(AppColors.textLight)
+                                .foregroundColor(.gray)
                         }
                         .accessibilityLabel("Collapse affirmation banner")
                     }
                     
                     Text(affirmation)
-                        .font(AppTextStyles.body2)
-                        .foregroundColor(AppColors.textDark)
+                        .font(.body)
+                        .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     
@@ -43,41 +43,43 @@ struct AffirmationBanner: View {
                         }) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 14))
-                                .foregroundColor(AppColors.textLight)
+                                .foregroundColor(.gray)
                         }
                         .accessibilityLabel("Get new affirmation")
                     }
                 }
                 .padding()
-                .background(AppColors.cardBackground)
-                .cornerRadius(AppLayout.cornerRadius)
+                .background(Color.white)
+                .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 5)
-                .accessibleCard(label: "Daily affirmation", hint: "An affirmation to boost your resilience")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Daily affirmation")
+                .accessibilityHint("An affirmation to boost your resilience")
             } else {
                 Button(action: {
                     withAnimation(.easeInOut) {
                         isExpanded = true
                     }
-                    HapticFeedback.light()
+                    // Haptic feedback would go here
                 }) {
                     HStack {
                         Image(systemName: "quote.bubble")
                             .font(.system(size: 14))
                         
                         Text("Show Today's Affirmation")
-                            .font(AppTextStyles.body3)
+                            .font(.subheadline)
                         
                         Image(systemName: "chevron.down")
                             .font(.system(size: 14))
                     }
-                    .foregroundColor(AppColors.textMedium)
+                    .foregroundColor(.secondary)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(AppLayout.cornerRadius)
+                    .background(Color.white)
+                    .cornerRadius(12)
                     .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 }
                 .padding(.horizontal)
@@ -91,7 +93,6 @@ struct AffirmationBanner: View {
         // In a real app, this would fetch a new affirmation
         // and update the storage. For now, we just notify the parent
         // via NotificationCenter to refresh
-        HapticFeedback.light()
         NotificationCenter.default.post(
             name: Notification.Name("refreshAffirmation"),
             object: nil
@@ -110,7 +111,7 @@ struct AffirmationBanner_Previews: PreviewProvider {
             AffirmationBanner(affirmation: "Your worth is not determined by external validation.")
             Spacer()
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.gray.opacity(0.1))
     }
 }
-#endif 
+#endif
