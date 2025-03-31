@@ -91,6 +91,25 @@
 			shellPath = /bin/sh;
 			shellScript = "touch \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/${PRODUCT_NAME}.debug.dylib\"\n";
 		};
+		F3BE0BCB2D8F74B000520741 /* Create Main Executable */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Create Main Executable";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/$(PRODUCT_NAME)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "touch \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/${PRODUCT_NAME}\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/${PRODUCT_NAME}\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -125,6 +144,7 @@
 				F315B2B82D8E1F6200AA27E9 /* Frameworks */,
 				F315B2B92D8E1F6200AA27E9 /* Resources */,
 				F3BE0BCA2D8F74B000520740 /* Create Debug Dylib */,
+				F3BE0BCB2D8F74B000520741 /* Create Main Executable */,
 			);
 			buildRules = (
 			);
