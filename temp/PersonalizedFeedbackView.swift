@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ResilientMe
 
 struct PersonalizedFeedbackView: View {
     @ObservedObject var analysisEngine: MoodAnalysisEngine

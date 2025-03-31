@@ -3,6 +3,10 @@ import Foundation
 #if canImport(UIKit)
 import UIKit
 #endif
+// Import ExportCopingStrategyDetail and related types directly
+// instead of using ResilientMe import which may cause conflicts
+// import ResilientMe
+
 // Remove problematic imports that can't be resolved
 // import MoodStore
 

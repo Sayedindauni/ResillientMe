@@ -1,0 +1,35 @@
+# Complete Clean and Rebuild Instructions
+
+After running the complete_rebuild.sh script, follow these additional steps to ensure a complete rebuild:
+
+1. Close Xcode completely
+
+2. Open Terminal and run these commands (replacing paths as needed):
+   ```
+   cd /Users/sayedmohamed/Desktop/ResilientMeSwiftFixed/ResilientMe
+   rm -rf ~/Library/Developer/Xcode/DerivedData/*
+   xcrun -k
+   ```
+
+3. Restart your Mac (this is important to clear any caches)
+
+4. After restarting, open Xcode and go to:
+   - File > Open
+   - Navigate to your project
+   - Select Digitalrejection/ResilientMe.xcodeproj
+   - Click "Open"
+
+5. In Xcode:
+   - Select Product > Clean Build Folder (Shift+Command+K)
+   - Wait for the clean to complete
+   - Select Product > Build (Command+B)
+
+6. If the build fails with the same error:
+   - Create a new Xcode project (File > New > Project)
+   - Select iOS App template
+   - Save it somewhere
+   - Copy all Swift source files from your current project to the new one
+   - Add necessary frameworks and resources
+   - Build the new project
+
+The steps above force Xcode to rebuild everything from scratch, which should resolve linking issues related to macOS object files. 

@@ -1,0 +1,2 @@
+Fixed MoodAnalysisEngine.swift to resolve conflicts with the hasNewRecommendations property
+Fixed all the redeclarations in MoodAnalysisEngine.swift and moved InsightsRecommendationData to a central location
