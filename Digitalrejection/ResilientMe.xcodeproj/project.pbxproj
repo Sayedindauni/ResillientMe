@@ -71,6 +71,28 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		F3BE0BCA2D8F74B000520740 /* Create Debug Dylib */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Create Debug Dylib";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/$(PRODUCT_NAME).debug.dylib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "touch \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/${PRODUCT_NAME}.debug.dylib\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXGroup section */
 		F315B2B22D8E1F6200AA27E9 = {
 			isa = PBXGroup;
@@ -102,6 +124,7 @@
 				F315B2B72D8E1F6200AA27E9 /* Sources */,
 				F315B2B82D8E1F6200AA27E9 /* Frameworks */,
 				F315B2B92D8E1F6200AA27E9 /* Resources */,
+				F3BE0BCA2D8F74B000520740 /* Create Debug Dylib */,
 			);
 			buildRules = (
 			);
@@ -402,7 +425,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ResilientMe/Preview Content\"";
 				DEVELOPMENT_TEAM = AZ3UBYX9QX;
-				ENABLE_PREVIEWS = YES;
+				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -432,7 +455,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ResilientMe/Preview Content\"";
 				DEVELOPMENT_TEAM = AZ3UBYX9QX;
-				ENABLE_PREVIEWS = YES;
+				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
