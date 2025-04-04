@@ -84,4 +84,6 @@ extension View {
     func styleAsCaption() -> some View {
         AppStyle.captionStyle(self)
     }
-} 
+}
+
+// MARK: - App Colors

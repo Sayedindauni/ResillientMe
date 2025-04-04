@@ -76,7 +76,7 @@ struct ContentView: View {
                     Text("Insights")
                 }
             
-            Text("Coping Strategies")
+            EnhancedCopingStrategiesLibraryView()
                 .tabItem {
                     Image(systemName: "brain.head.profile")
                     Text("Strategies")
