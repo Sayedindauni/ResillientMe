@@ -825,7 +825,7 @@ struct DashboardView: View {
                             selectedCategoryFilter = category
                             showingAllStrategies = true
                         }) {
-                            HStack {
+            HStack {
                                 Image(systemName: category.iconName)
                                     .font(.system(size: 12))
                                 
@@ -848,7 +848,7 @@ struct DashboardView: View {
             // Featured strategies - just show a few highlighted ones
             VStack(alignment: .leading, spacing: 16) {
                 // Recently used or recommended strategies
-                if !recentlyUsedStrategies.isEmpty {
+            if !recentlyUsedStrategies.isEmpty {
                     Text("Recently Used")
                         .font(AppTextStyles.h4)
                         .foregroundColor(AppColors.textDark)
@@ -865,15 +865,15 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.bottom, 8)
-                }
+            }
             
                 // Quick strategies section - just a few examples
                 Text("Quick Relief")
                 .font(AppTextStyles.h4)
                 .foregroundColor(AppColors.textDark)
             
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
                         let quickStrategies = getStrategiesByTime(minutes: 5, includeUnder: true).prefix(3)
                         ForEach(Array(quickStrategies)) { strategy in
                             strategyCard(strategy)

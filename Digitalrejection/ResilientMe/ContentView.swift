@@ -10,8 +10,6 @@ import CoreData
 import ResilientMe
 
 // Import all necessary views
-import struct ResilientMe.JournalView
-import struct ResilientMe.MoodView
 import struct ResilientMe.CommunityView
 import struct ResilientMe.ProfileView
 import struct ResilientMe.InsightsView
@@ -47,40 +45,27 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            JournalView()
+            // Combined MoodJournalView replacing separate Journal and Mood tabs
+            MoodJournalView(context: viewContext, moodAnalysisEngine: moodAnalysisEngine)
                 .tabItem {
                     Image(systemName: "book.fill")
-                    Text("Journal")
+                    Text("Journal & Mood")
                 }
                 .tag(1)
-            
-            MoodView(context: viewContext, moodAnalysisEngine: moodAnalysisEngine)
-                .tabItem {
-                    Image(systemName: "heart.fill")
-                    Text("Mood")
-                }
-                .tag(2)
             
             CommunityView()
                 .tabItem {
                     Image(systemName: "person.3.fill")
                     Text("Community")
                 }
-                .tag(3)
+                .tag(2)
             
             ProfileView()
                 .tabItem {
                     Image(systemName: "person.circle.fill")
                     Text("Profile")
                 }
-                .tag(4)
-            
-            InsightsView(moodAnalysisEngine: moodAnalysisEngine)
-                .tabItem {
-                    Image(systemName: "chart.bar.xaxis")
-                    Text("Insights")
-                }
-                .tag(5)
+                .tag(3)
         }
     }
     
