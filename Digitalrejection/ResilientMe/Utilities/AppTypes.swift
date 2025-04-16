@@ -75,7 +75,7 @@ public struct Strategy: Identifiable {
 }
 
 /// Model for onboarding messages
-public struct OnboardingMessage: Identifiable {
+public struct AppOnboardingMessage: Identifiable {
     public let id = UUID()
     public let title: String
     public let subtitle: String
@@ -197,7 +197,41 @@ public enum AppResourceType: String, CaseIterable, Identifiable {
 // public typealias LocalCopingStrategyCategory = ResilientMe.EngineCopingStrategyCategory
 
 // Add a typealias to resolve the naming issue
-public typealias LocalCopingStrategyCategory = EngineCopingStrategyCategory
+// public typealias LocalCopingStrategyCategory = EngineCopingStrategyCategory
+
+// Define the enum directly to avoid import and typealias issues
+public enum LocalCopingStrategyCategory: String, CaseIterable, Identifiable {
+    case mindfulness = "Mindfulness"
+    case cognitive = "Cognitive"
+    case physical = "Physical"
+    case social = "Social"
+    case creative = "Creative"
+    case selfCare = "Self-Care"
+    
+    public var id: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .mindfulness: return "brain.head.profile"
+        case .cognitive: return "lightbulb"
+        case .physical: return "figure.walk"
+        case .social: return "person.2"
+        case .creative: return "paintpalette"
+        case .selfCare: return "heart.fill"
+        }
+    }
+    
+    public var color: Color {
+        switch self {
+        case .mindfulness: return .blue
+        case .cognitive: return .blue
+        case .physical: return .green
+        case .social: return .purple
+        case .creative: return .orange
+        case .selfCare: return .pink
+        }
+    }
+}
 
 // The actual coping strategy detail type
 public struct LocalCopingStrategyDetail: Identifiable, Hashable {

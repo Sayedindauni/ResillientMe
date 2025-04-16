@@ -13,10 +13,10 @@ import ResilientMe
 extension LocalCopingStrategiesLibrary {
     
     // Add CoreStrategyDetail support
-    public func getStrategiesAsDetails() -> [CoreStrategyDetail] {
+    public func getStrategiesAsDetails() -> [ResilientMe.CoreStrategyDetail] {
         // Convert LocalCopingStrategyDetail to CoreStrategyDetail
         return strategies.map { localStrategy in
-            CoreStrategyDetail(
+            ResilientMe.CoreStrategyDetail(
                 name: localStrategy.title,
                 description: localStrategy.description,
                 category: mapLocalCategoryToGlobal(localStrategy.category),
@@ -29,7 +29,7 @@ extension LocalCopingStrategiesLibrary {
     }
     
     // Map local categories to global CopingStrategyCategory
-    private func mapLocalCategoryToGlobal(_ localCategory: ResilientMe.EngineModels.StrategyCategory) -> CoreCopingCategory {
+    private func mapLocalCategoryToGlobal(_ localCategory: LocalCopingStrategyCategory) -> ResilientMe.CoreCopingCategory {
         switch localCategory {
         case .mindfulness:
             return .mindfulness
@@ -47,7 +47,7 @@ extension LocalCopingStrategiesLibrary {
     }
     
     // Convert time string to StrategyDuration
-    private func getDurationFromTimeString(_ timeString: String) -> CoreStrategyDuration {
+    private func getDurationFromTimeString(_ timeString: String) -> ResilientMe.CoreStrategyDuration {
         if timeString.contains("Under 2") || timeString.contains("1-2") {
             return .veryShort
         } else if timeString.contains("3-5") || timeString.contains("2-5") {
@@ -60,7 +60,7 @@ extension LocalCopingStrategiesLibrary {
     }
     
     // Map CopingStrategyCategory to string description
-    public func mapToGlobalCategory(_ category: CoreCopingCategory) -> String {
+    public func mapToGlobalCategory(_ category: ResilientMe.CoreCopingCategory) -> String {
         switch category {
         case .mindfulness:
             return "Mindfulness & Meditation"

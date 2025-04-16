@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var dailyAffirmation = LocalAppCopy.randomAffirmation()
     @StateObject private var moodStore: CoreDataMoodStore
     @StateObject private var moodAnalysisEngine: MoodAnalysisEngine
+    @State private var selectedTab = 0
     
     // Add initializer to accept context parameter
     init(context: NSManagedObjectContext) {
@@ -39,49 +40,80 @@ struct ContentView: View {
     }
     
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             DashboardView()
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
                 }
+                .tag(0)
             
             JournalView()
                 .tabItem {
                     Image(systemName: "book.fill")
                     Text("Journal")
                 }
+                .tag(1)
             
             MoodView(context: viewContext, moodAnalysisEngine: moodAnalysisEngine)
                 .tabItem {
                     Image(systemName: "heart.fill")
                     Text("Mood")
                 }
+                .tag(2)
             
             CommunityView()
                 .tabItem {
                     Image(systemName: "person.3.fill")
                     Text("Community")
                 }
+                .tag(3)
             
             ProfileView()
                 .tabItem {
                     Image(systemName: "person.circle.fill")
                     Text("Profile")
                 }
+                .tag(4)
             
             InsightsView(moodAnalysisEngine: moodAnalysisEngine)
                 .tabItem {
                     Image(systemName: "chart.bar.xaxis")
                     Text("Insights")
                 }
+                .tag(5)
             
             EnhancedCopingStrategiesLibraryView()
                 .tabItem {
                     Image(systemName: "brain.head.profile")
                     Text("Strategies")
                 }
+                .tag(6)
         }
+        .onAppear {
+            setupNotificationObservers()
+        }
+        .onDisappear {
+            removeNotificationObservers()
+        }
+    }
+    
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SwitchToStrategiesTab"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            selectedTab = 6 // Switch to the Strategies tab
+        }
+    }
+    
+    private func removeNotificationObservers() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name("SwitchToStrategiesTab"),
+            object: nil
+        )
     }
     
     private func refreshAffirmation() {

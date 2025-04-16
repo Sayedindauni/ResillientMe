@@ -1,5 +1,16 @@
 import SwiftUI
 import ResilientMe
+import UIKit
+
+// Add extension for accessibility card
+extension View {
+    func accessibleCard(label: String, hint: String) -> some View {
+        self
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(label)
+            .accessibilityHint(hint)
+    }
+}
 
 struct OnboardingScreenView: View {
     @Binding var isPresented: Bool
@@ -8,24 +19,24 @@ struct OnboardingScreenView: View {
     @State private var currentPage = 0
     private let totalPages = 4
     
-    // Onboarding content
+    // Onboarding content - explicitly using ResilientMe.AppOnboardingMessage instead of OnboardingMessage
     private let onboardingContent = [
-        OnboardingMessage(
+        ResilientMe.AppOnboardingMessage(
             title: "Welcome to ResilientMe",
             subtitle: "Your personal resilience building companion",
             message: "This app is designed to help you develop coping strategies, track your mood, and build resilience in the face of rejection experiences."
         ),
-        OnboardingMessage(
+        ResilientMe.AppOnboardingMessage(
             title: "Track Your Emotions",
             subtitle: "Understand your patterns",
             message: "Log your moods and feelings to identify patterns over time. Recognizing emotional trends is the first step toward building emotional resilience."
         ),
-        OnboardingMessage(
+        ResilientMe.AppOnboardingMessage(
             title: "Journal Your Experiences",
             subtitle: "Process through reflection",
             message: "Use the journal to reflect on your experiences, both positive and challenging. Regular reflection helps develop self-awareness and growth."
         ),
-        OnboardingMessage(
+        ResilientMe.AppOnboardingMessage(
             title: "Connect and Grow",
             subtitle: "You're not alone",
             message: "Join our supportive community to share experiences and strategies. Building connections is a key part of developing resilience."
@@ -35,7 +46,7 @@ struct OnboardingScreenView: View {
     var body: some View {
         ZStack {
             // Background
-            AppColors.background
+            ResilientMe.AppColors.background
                 .ignoresSafeArea()
             
             VStack {
@@ -44,15 +55,15 @@ struct OnboardingScreenView: View {
                     Spacer()
                     
                     Button(action: {
-                        completeOnboarding()
+                        self.completeOnboarding()
                     }) {
                         Text("Skip")
-                            .font(AppTextStyles.body3)
-                            .foregroundColor(AppColors.textMedium)
+                            .font(ResilientMe.AppTextStyles.body3)
+                            .foregroundColor(ResilientMe.AppColors.textMedium)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(AppColors.background)
-                            .cornerRadius(AppLayout.cornerRadius)
+                            .background(ResilientMe.AppColors.background)
+                            .cornerRadius(ResilientMe.AppLayout.cornerRadius)
                     }
                     .accessibilityLabel("Skip onboarding")
                 }
@@ -74,7 +85,7 @@ struct OnboardingScreenView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<onboardingContent.count, id: \.self) { index in
                         Circle()
-                            .fill(currentPage == index ? AppColors.primary : AppColors.textLight.opacity(0.3))
+                            .fill(currentPage == index ? ResilientMe.AppColors.primary : ResilientMe.AppColors.textLight.opacity(0.3))
                             .frame(width: 8, height: 8)
                     }
                 }
@@ -86,18 +97,18 @@ struct OnboardingScreenView: View {
                     if currentPage > 0 {
                         Button(action: {
                             currentPage -= 1
-                            HapticFeedback.light()
+                            ResilientMe.LocalHapticFeedback.light()
                         }) {
                             HStack {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
                             }
-                            .font(AppTextStyles.buttonFont)
-                            .foregroundColor(AppColors.textMedium)
+                            .font(ResilientMe.AppTextStyles.body1)
+                            .foregroundColor(ResilientMe.AppColors.textMedium)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
-                            .background(AppColors.background)
-                            .cornerRadius(AppLayout.cornerRadius)
+                            .background(ResilientMe.AppColors.background)
+                            .cornerRadius(ResilientMe.AppLayout.cornerRadius)
                         }
                         .accessibilityLabel("Go to previous page")
                     }
@@ -108,9 +119,9 @@ struct OnboardingScreenView: View {
                     Button(action: {
                         if currentPage < totalPages - 1 {
                             currentPage += 1
-                            HapticFeedback.light()
+                            ResilientMe.LocalHapticFeedback.light()
                         } else {
-                            completeOnboarding()
+                            self.completeOnboarding()
                         }
                     }) {
                         HStack {
@@ -120,12 +131,12 @@ struct OnboardingScreenView: View {
                                 Image(systemName: "chevron.right")
                             }
                         }
-                        .font(AppTextStyles.buttonFont)
+                        .font(ResilientMe.AppTextStyles.body1)
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
-                        .background(AppColors.primary)
-                        .cornerRadius(AppLayout.cornerRadius)
+                        .background(ResilientMe.AppColors.primary)
+                        .cornerRadius(ResilientMe.AppLayout.cornerRadius)
                     }
                     .accessibilityLabel(currentPage < totalPages - 1 ? "Go to next page" : "Complete onboarding")
                 }
@@ -136,53 +147,58 @@ struct OnboardingScreenView: View {
         .transition(.opacity)
     }
     
-    private func onboardingPage(_ content: OnboardingMessage) -> some View {
+    private func onboardingPage(_ content: ResilientMe.AppOnboardingMessage) -> some View {
         VStack(spacing: 25) {
             // Icon/image placeholder
             ZStack {
                 Circle()
-                    .fill(AppColors.accent3.opacity(0.2))
+                    .fill(ResilientMe.AppColors.accent3.opacity(0.2))
                     .frame(width: 160, height: 160)
                 
-                Image(systemName: iconForPage(currentPage))
+                Image(systemName: self.getIconForPage(currentPage))
                     .font(.system(size: 60))
-                    .foregroundColor(AppColors.primary)
+                    .foregroundColor(ResilientMe.AppColors.primary)
             }
             .padding(.bottom, 10)
             
             // Text content
             VStack(spacing: 16) {
                 Text(content.title)
-                    .font(AppTextStyles.h1)
-                    .foregroundColor(AppColors.textDark)
+                    .font(ResilientMe.AppTextStyles.h2)
+                    .foregroundColor(ResilientMe.AppColors.textDark)
                     .multilineTextAlignment(.center)
                 
                 Text(content.subtitle)
-                    .font(AppTextStyles.h4)
-                    .foregroundColor(AppColors.primary)
+                    .font(ResilientMe.AppTextStyles.h4)
+                    .foregroundColor(ResilientMe.AppColors.primary)
                     .multilineTextAlignment(.center)
                 
                 Text(content.message)
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textMedium)
+                    .font(ResilientMe.AppTextStyles.body2)
+                    .foregroundColor(ResilientMe.AppColors.textMedium)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
             }
         }
         .padding()
-        .accessibleCard(
-            label: content.title, 
-            hint: content.message
-        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(content.title)
+        .accessibilityHint(content.message)
     }
     
-    private func iconForPage(_ page: Int) -> String {
+    // Renamed to avoid potential conflicts
+    private func getIconForPage(_ page: Int) -> String {
         switch page {
-        case 0: return "heart.circle.fill"
-        case 1: return "chart.bar.fill"
-        case 2: return "book.fill"
-        case 3: return "person.3.fill"
-        default: return "heart.fill"
+        case 0:
+            return "heart.circle.fill"
+        case 1:
+            return "chart.bar.fill"
+        case 2:
+            return "book.fill"
+        case 3:
+            return "person.3.fill"
+        default:
+            return "heart.fill"
         }
     }
     
@@ -191,7 +207,7 @@ struct OnboardingScreenView: View {
             hasCompletedOnboarding = true
             isPresented = false
         }
-        AppHapticFeedback.success()
+        ResilientMe.LocalHapticFeedback.success()
     }
 }
 

@@ -322,96 +322,77 @@ struct DashboardView: View {
     
     private var copingStrategiesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
-            HStack {
-                Text("Coping Strategies Library")
-                    .font(AppTextStyles.h3)
-                    .foregroundColor(AppColors.textDark)
-                
-                Spacer()
-                
-                Button(action: {
-                    // Use NotificationCenter to communicate with the main ContentView to switch tabs
-                    NotificationCenter.default.post(name: Notification.Name("switchToStrategiesTab"), object: nil)
-                }) {
-                    Text("See All")
-                        .font(AppTextStyles.body3)
-                        .foregroundColor(AppColors.primary)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .contentShape(Rectangle())
-            }
+            SectionHeader(title: "Coping Strategies", icon: "brain.head.profile")
             
-            // Description
-            Text("Evidence-based techniques to manage rejection and build resilience")
-                .font(AppTextStyles.body2)
-                .foregroundColor(AppColors.textMedium)
-            
-            // Search bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.textMedium)
-                
-                TextField("Search strategies...", text: $searchText)
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textDark)
-                
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.textMedium)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
-            .padding(.vertical, 8)
-            
-            // Recently used strategies
-            if !recentlyUsedStrategies.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Recently Used")
-                        .font(AppTextStyles.h4)
-                        .foregroundColor(AppColors.textDark)
+            VStack(alignment: .leading, spacing: 20) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(AppColors.textMedium)
                     
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(recentlyUsedStrategies) { strategy in
-                                recentStrategyCard(strategy)
-                                    .onTapGesture {
-                                        selectedStrategy = strategy
-                                        showingStrategyDetail = true
-                                    }
-                            }
+                    TextField("Search strategies...", text: $searchText)
+                        .font(AppTextStyles.body2)
+                    
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppColors.textMedium)
                         }
                     }
                 }
-                .padding(.vertical, 8)
-            }
-            
-            // Categories section
-            Text("Browse by Category")
-                .font(AppTextStyles.h4)
-                .foregroundColor(AppColors.textDark)
-                .padding(.top, 8)
-            
-            // Featured strategies scroll view
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    // Get a few strategies from each category
-                    ForEach(getCopingStrategyCategories(), id: \.self) { category in
-                        copingStrategyCategoryCard(category)
+                .padding(10)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                
+                // Recently used section
+                if !recentlyUsedStrategies.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recently Used")
+                            .font(AppTextStyles.h4)
+                            .foregroundColor(AppColors.textDark)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(recentlyUsedStrategies) { strategy in
+                                    strategyCard(strategy)
+                                        .onTapGesture {
+                                            selectedStrategy = strategy
+                                            showingStrategyDetail = true
+                                        }
+                                }
+                            }
+                            .padding(.bottom, 8)
+                        }
                     }
                 }
-                .padding(.vertical, 8)
+                
+                // Quick Relief section
+                strategiesSection(
+                    title: "Quick Relief",
+                    description: "5 minutes or less",
+                    strategies: getStrategiesByTime(minutes: 5, includeUnder: true)
+                )
+                
+                // Moderate Practice section
+                strategiesSection(
+                    title: "Moderate Practice",
+                    description: "5-15 minutes",
+                    strategies: getStrategiesByTime(minutes: 15, includeUnder: true, minimum: 5)
+                )
+                
+                // In-Depth Process section
+                strategiesSection(
+                    title: "In-Depth Process",
+                    description: "More than 15 minutes",
+                    strategies: getStrategiesByTime(minutes: 15, includeUnder: false)
+                )
             }
         }
         .padding()
         .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
-        .accessibleCard(label: "Coping Strategies Library", hint: "Browse evidence-based coping techniques")
+        .accessibleCard(label: "Coping strategies", hint: "Browse evidence-based techniques to manage rejection")
         .sheet(isPresented: $showingStrategyDetail) {
             if let strategy = selectedStrategy {
                 strategyDetailView(strategy)
@@ -419,98 +400,136 @@ struct DashboardView: View {
         }
     }
     
-    private func recentStrategyCard(_ strategy: AppCopingStrategyDetail) -> some View {
+    // MARK: - Strategy Section Helpers
+    
+    func strategiesSection(title: String, description: String, strategies: [AppCopingStrategyDetail]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Category and icon
             HStack {
-                Image(systemName: strategy.category.iconName)
-                    .font(.system(size: 16))
-                    .foregroundColor(strategy.category.color)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(AppTextStyles.h4)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    Text(description)
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textMedium)
+                }
                 
+                Spacer()
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(strategies.prefix(5)) { strategy in
+                        strategyCard(strategy)
+                            .onTapGesture {
+                                selectedStrategy = strategy
+                                showingStrategyDetail = true
+                            }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+    
+    func getStrategiesByTime(minutes: Int, includeUnder: Bool, minimum: Int = 0) -> [AppCopingStrategyDetail] {
+        let allStrategies = AppCopingStrategiesLibrary.shared.strategies
+        
+        return allStrategies.filter { strategy in
+            // Parse the timeToComplete string to get minutes
+            let timeString = strategy.timeToComplete.lowercased()
+            let extractedMinutes = extractMinutes(from: timeString)
+            
+            if includeUnder {
+                return extractedMinutes <= minutes && extractedMinutes >= minimum
+            } else {
+                return extractedMinutes > minutes
+            }
+        }
+    }
+    
+    func extractMinutes(from timeString: String) -> Int {
+        // Extract numeric values from strings like "5 minutes", "10-15 minutes"
+        // For ranges, take the average or maximum
+        if timeString.contains("-") {
+            let components = timeString.components(separatedBy: "-")
+            if components.count >= 2 {
+                let firstPart = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let secondPart = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if let min = Int(firstPart.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()),
+                   let max = Int(secondPart.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) {
+                    return max // Use maximum of range
+                }
+            }
+        }
+        
+        // Extract single values
+        let numbers = timeString.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                                .joined()
+        if let minutes = Int(numbers) {
+            return minutes
+        }
+        
+        // Default values based on common descriptions
+        if timeString.contains("quick") || timeString.contains("brief") {
+            return 5
+        } else if timeString.contains("moderate") {
+            return 10
+        } else if timeString.contains("long") || timeString.contains("extended") {
+            return 20
+        }
+        
+        return 10 // Default assumption
+    }
+    
+    func strategyCard(_ strategy: AppCopingStrategyDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Category and intensity pill
+            HStack {
                 Text(strategy.category.rawValue)
                     .font(AppTextStyles.body3)
-                    .foregroundColor(strategy.category.color)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(strategy.category.color)
+                    .cornerRadius(8)
                 
                 Spacer()
                 
-                // Favorite button
-                Button(action: {
-                    toggleFavorite(strategy)
-                }) {
-                    Image(systemName: isFavorite(strategy) ? "heart.fill" : "heart")
-                        .font(.system(size: 14))
-                        .foregroundColor(isFavorite(strategy) ? .red : AppColors.textMedium)
+                // Time indicator
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 12))
+                    Text(strategy.timeToComplete)
+                        .font(AppTextStyles.body3)
                 }
+                .foregroundColor(AppColors.textMedium)
             }
             
             // Strategy title
             Text(strategy.title)
-                .font(AppTextStyles.body1)
+                .font(AppTextStyles.h4)
                 .foregroundColor(AppColors.textDark)
                 .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: 48, alignment: .top)
             
-            // Time to complete
-            HStack {
-                Image(systemName: "clock")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppColors.textMedium)
-                
-                Text(strategy.timeToComplete)
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(AppColors.textMedium)
-            }
+            // Strategy description
+            Text(strategy.description)
+                .font(AppTextStyles.body3)
+                .foregroundColor(AppColors.textMedium)
+                .lineLimit(3)
+                .frame(height: 54, alignment: .top)
         }
         .padding()
-        .frame(width: 180, height: 130)
-        .background(AppColors.background)
+        .frame(width: 250)
+        .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
-                .stroke(strategy.category.color.opacity(0.2), lineWidth: 1)
-        )
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
     }
     
-    private func copingStrategyCategoryCard(_ category: AppCopingStrategyCategory) -> some View {
-        Button(action: {
-            // Pass the category to the notification for the strategies tab
-            NotificationCenter.default.post(name: Notification.Name("switchToStrategiesTab"), object: category)
-        }) {
-            VStack(alignment: .leading, spacing: 12) {
-                // Category icon
-                Image(systemName: category.iconName)
-                    .font(.system(size: 24))
-                    .foregroundColor(category.color)
-                    .frame(width: 48, height: 48)
-                    .background(category.color.opacity(0.1))
-                    .cornerRadius(12)
-                
-                // Category name
-                Text(category.rawValue)
-                    .font(AppTextStyles.body1)
-                    .foregroundColor(AppColors.textDark)
-                    .lineLimit(1)
-                
-                // Sample strategy count
-                Text(getStrategyCountDescription(for: category))
-                    .font(AppTextStyles.captionText)
-                    .foregroundColor(AppColors.textMedium)
-                    .lineLimit(1)
-                
-                Spacer()
-            }
-            .frame(width: 140, height: 140)
-            .padding()
-            .background(AppColors.background)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(category.color.opacity(0.3), lineWidth: 1)
-            )
-        }
-    }
-    
-    private func strategyDetailView(_ strategy: AppCopingStrategyDetail) -> some View {
+    func strategyDetailView(_ strategy: AppCopingStrategyDetail) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
@@ -518,10 +537,10 @@ struct DashboardView: View {
                     HStack {
                         Text(strategy.category.rawValue)
                             .font(AppTextStyles.body2)
-                            .foregroundColor(strategy.category.color)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(strategy.category.color.opacity(0.1))
+                            .background(strategy.category.color)
                             .cornerRadius(12)
                         
                         Spacer()
@@ -576,30 +595,6 @@ struct DashboardView: View {
                     }
                 }
                 
-                // Tips if available
-                if let tips = strategy.tips, !tips.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Tips")
-                            .font(AppTextStyles.h4)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(tips, id: \.self) { tip in
-                                HStack(alignment: .top) {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.yellow)
-                                        .font(.system(size: 14))
-                                        .frame(width: 16)
-                                    
-                                    Text(tip)
-                                        .font(AppTextStyles.body2)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-                
                 // "I've Practiced This" button
                 Button(action: {
                     markStrategyAsUsed(strategy)
@@ -620,18 +615,7 @@ struct DashboardView: View {
         }
     }
     
-    // Helper methods for coping strategies section
-    private func getCopingStrategyCategories() -> [AppCopingStrategyCategory] {
-        return AppCopingStrategyCategory.allCases
-    }
-    
-    private func getStrategyCountDescription(for category: AppCopingStrategyCategory) -> String {
-        // Count strategies by filtering the full list by category
-        let count = AppCopingStrategiesLibrary.shared.strategies.filter { $0.category == category }.count
-        return "\(count) technique\(count == 1 ? "" : "s")"
-    }
-    
-    private func toggleFavorite(_ strategy: AppCopingStrategyDetail) {
+    func toggleFavorite(_ strategy: AppCopingStrategyDetail) {
         if isFavorite(strategy) {
             favoriteStrategies.removeAll { $0 == strategy.id }
         } else {
@@ -640,11 +624,11 @@ struct DashboardView: View {
         }
     }
     
-    private func isFavorite(_ strategy: AppCopingStrategyDetail) -> Bool {
+    func isFavorite(_ strategy: AppCopingStrategyDetail) -> Bool {
         return favoriteStrategies.contains(strategy.id)
     }
     
-    private func markStrategyAsUsed(_ strategy: AppCopingStrategyDetail) {
+    func markStrategyAsUsed(_ strategy: AppCopingStrategyDetail) {
         // Remove if already in the list
         recentlyUsedStrategies.removeAll { $0.id == strategy.id }
         
@@ -664,7 +648,7 @@ struct DashboardView: View {
     
     // MARK: - Resources Section
     
-    private var resourcesSection: some View {
+    var resourcesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Resources", icon: "book")
             
@@ -676,7 +660,7 @@ struct DashboardView: View {
     
     // MARK: - Community Section
     
-    private var communitySection: some View {
+    var communitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Community", icon: "person.3")
             
@@ -729,7 +713,7 @@ struct DashboardView: View {
     
     // MARK: - Daily Tip Card
     
-    private var tipCard: some View {
+    var tipCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "lightbulb.fill")
@@ -833,7 +817,7 @@ struct DashboardView: View {
     
     // MARK: - Helper Functions
     
-    private func formattedDate() -> String {
+    func formattedDate() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMMM d"
         return formatter.string(from: Date())

@@ -182,6 +182,8 @@ struct EnhancedCopingStrategiesLibraryView: View {
     @State private var showingStrategyDetail = false
     @State private var showingFilterOptions = false
     @State private var intensityFilter: LocalCopingStrategyDetail.StrategyIntensity?
+    @State private var showingAllStrategies = false
+    @State private var allStrategiesTitle = ""
     
     var body: some View {
         NavigationView {
@@ -237,6 +239,16 @@ struct EnhancedCopingStrategiesLibraryView: View {
                 EnhancedStrategyDetailView(strategy: strategy, onClose: {
                     selectedStrategy = nil
                 })
+            }
+            .sheet(isPresented: $showingAllStrategies) {
+                StrategyListView(
+                    title: allStrategiesTitle,
+                    strategies: filteredStrategiesByIntensity(for: intensityFilter),
+                    onStrategySelected: { strategy in
+                        selectedStrategy = strategy
+                        showingAllStrategies = false
+                    }
+                )
             }
             .navigationBarHidden(true)
             .onAppear {
@@ -384,7 +396,16 @@ struct EnhancedCopingStrategiesLibraryView: View {
                 Spacer()
                 
                 Button(action: {
-                    // View all in this category
+                    // Show all strategies in this category
+                    if title == "Quick Relief" {
+                        intensityFilter = .quick
+                    } else if title == "Moderate Practice" {
+                        intensityFilter = .moderate
+                    } else if title == "In-Depth Process" {
+                        intensityFilter = .intensive
+                    }
+                    allStrategiesTitle = title
+                    showingAllStrategies = true
                 }) {
                     Text("View All")
                         .font(AppTextStyles.body3)
@@ -574,6 +595,23 @@ struct EnhancedCopingStrategiesLibraryView: View {
     private var intensiveStrategies: [LocalCopingStrategyDetail] {
         filteredStrategies.filter { $0.intensity == .intensive }
     }
+    
+    // Helper method to get strategies filtered by intensity
+    private func filteredStrategiesByIntensity(for intensity: LocalCopingStrategyDetail.StrategyIntensity?) -> [LocalCopingStrategyDetail] {
+        guard let intensity = intensity else { return [] }
+        
+        var strategies = strategiesLibrary.strategies
+        
+        // Apply category filter if selected
+        if let category = selectedCategory {
+            strategies = strategies.filter { $0.category == category }
+        }
+        
+        // Filter by intensity
+        strategies = strategies.filter { $0.intensity == intensity }
+        
+        return strategies
+    }
 }
 
 // MARK: - Enhanced Strategy Detail View
@@ -600,6 +638,49 @@ struct EnhancedStrategyDetailView: View {
     @State private var estimatedSeconds: Int = 0
     @State private var timerProgress: CGFloat = 0
     
+    // Breathing exercise variables
+    @State private var showingBreathingExercise = false
+    @State private var breathingPhase: BreathingPhase = .inhale
+    @State private var breathingCycleCount = 0
+    @State private var breathingPattern: BreathingPattern = .fourSevenEight
+    @State private var breathingScale: CGFloat = 1.0
+    @State private var breathingOpacity: Double = 0.8
+    
+    // Grounding exercise variables
+    @State private var groundingItems: [GroundingItem] = []
+    @State private var showingGroundingExercise = false
+    @State private var groundingStep = 0
+    
+    // Journaling variables
+    @State private var journalText = ""
+    @State private var showingJournalExercise = false
+    @State private var journalPrompts: [String] = []
+    @State private var currentJournalPrompt = 0
+    
+    // Strategy type detection
+    var strategyType: StrategyType {
+        let title = strategy.title.lowercased()
+        let desc = strategy.description.lowercased()
+        let steps = strategy.steps.joined().lowercased()
+        
+        if title.contains("breath") || desc.contains("breath") || 
+           steps.contains("inhale") || steps.contains("exhale") {
+            return .breathing
+        } else if title.contains("ground") || desc.contains("ground") || 
+                title.contains("5-4-3-2-1") || desc.contains("5-4-3-2-1") ||
+                steps.contains("see") || steps.contains("touch") || steps.contains("hear") {
+            return .grounding
+        } else if title.contains("journal") || desc.contains("journal") || 
+                 title.contains("writ") || desc.contains("writ") || 
+                 steps.contains("write") || steps.contains("journal") {
+            return .journaling
+        } else if title.contains("meditat") || desc.contains("meditat") {
+            return .meditation
+        } else {
+            return .standard
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -607,17 +688,24 @@ struct EnhancedStrategyDetailView: View {
                     // Header section with title, category, time
                     headerSection
                     
+                    // Interactive exercise component based on strategy type
+                    interactiveExerciseSection
+                    
                     // Description section
                     descriptionSection
                     
-                    // Guided mode toggle
-                    guidedModeToggle
+                    // Guided mode toggle (for standard strategies)
+                    if strategyType == .standard {
+                        guidedModeToggle
+                    }
                     
                     // Steps section
                     stepsSection
                     
-                    // Timer section if applicable
-                    timerSection
+                    // Timer section if applicable and not an active specialized exercise
+                    if shouldShowTimer {
+                        timerSection
+                    }
                     
                     // Usage section
                     usageSection
@@ -671,6 +759,7 @@ struct EnhancedStrategyDetailView: View {
                 moodCheckInView
             }
             .onAppear {
+                setupStrategyInteractivity()
                 estimateTimerDuration()
                 // Show mood check-in when strategy detail is first shown
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -680,7 +769,675 @@ struct EnhancedStrategyDetailView: View {
         }
         .onDisappear {
             stopTimer()
+            stopBreathingExercise()
         }
+    }
+    
+    // Helper to determine if timer should be shown
+    private var shouldShowTimer: Bool {
+        if strategyType == .breathing && showingBreathingExercise { return false }
+        if strategyType == .grounding && showingGroundingExercise { return false }
+        if strategyType == .journaling && showingJournalExercise { return false }
+        if strategyType == .meditation { return true } // Always show timer for meditation
+        return strategy.timeToComplete.contains("minute")
+    }
+    
+    // MARK: - Setup Strategy Interactivity
+    private func setupStrategyInteractivity() {
+        switch strategyType {
+        case .grounding:
+            setupGroundingExercise()
+        case .journaling:
+            setupJournalingExercise()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Interactive Exercise Section
+    private var interactiveExerciseSection: some View {
+        Group {
+            switch strategyType {
+            case .breathing:
+                breathingExerciseSection
+            case .grounding:
+                groundingExerciseSection
+            case .journaling:
+                journalingExerciseSection
+            case .meditation:
+                meditationExerciseSection
+            case .standard:
+                EmptyView()
+            }
+        }
+    }
+    
+    // MARK: - Grounding Exercise
+    private func setupGroundingExercise() {
+        // Parse strategy steps to extract grounding prompts
+        if strategy.title.contains("5-4-3-2-1") || strategy.description.contains("5-4-3-2-1") {
+            // 5-4-3-2-1 Grounding Technique
+            groundingItems = [
+                GroundingItem(sense: "See", count: 5, prompt: "Find 5 things you can see around you"),
+                GroundingItem(sense: "Touch", count: 4, prompt: "Find 4 things you can touch or feel"),
+                GroundingItem(sense: "Hear", count: 3, prompt: "Notice 3 things you can hear"),
+                GroundingItem(sense: "Smell", count: 2, prompt: "Identify 2 things you can smell"),
+                GroundingItem(sense: "Taste", count: 1, prompt: "Acknowledge 1 thing you can taste")
+            ]
+        } else {
+            // Generic grounding - extract from steps
+            var items: [GroundingItem] = []
+            for (index, step) in strategy.steps.enumerated() {
+                if step.lowercased().contains("see") || step.lowercased().contains("look") {
+                    items.append(GroundingItem(sense: "See", count: 1, prompt: step))
+                } else if step.lowercased().contains("touch") || step.lowercased().contains("feel") {
+                    items.append(GroundingItem(sense: "Touch", count: 1, prompt: step))
+                } else if step.lowercased().contains("hear") || step.lowercased().contains("listen") {
+                    items.append(GroundingItem(sense: "Hear", count: 1, prompt: step))
+                } else if step.lowercased().contains("smell") {
+                    items.append(GroundingItem(sense: "Smell", count: 1, prompt: step))
+                } else if step.lowercased().contains("taste") {
+                    items.append(GroundingItem(sense: "Taste", count: 1, prompt: step))
+                } else if index < 5 {
+                    // For other steps, categorize based on position
+                    let senses = ["See", "Touch", "Hear", "Smell", "Taste"]
+                    if index < senses.count {
+                        items.append(GroundingItem(sense: senses[index], count: 1, prompt: step))
+                    }
+                }
+            }
+            if !items.isEmpty {
+                groundingItems = items
+            }
+        }
+    }
+    
+    private var groundingExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Grounding Exercise")
+                .font(AppTextStyles.h4)
+                .foregroundColor(AppColors.textDark)
+            
+            if !showingGroundingExercise {
+                // Preview/start view
+                VStack(spacing: 16) {
+                    Text("This is a grounding technique to help you connect with your surroundings and reduce anxiety or stress.")
+                        .font(AppTextStyles.body2)
+                        .foregroundColor(AppColors.textMedium)
+                    
+                    // Exercise preview
+                    HStack(spacing: 12) {
+                        ForEach(0..<min(5, groundingItems.count), id: \.self) { index in
+                            let item = groundingItems[index]
+                            Circle()
+                                .fill(getGroundingSenseColor(sense: item.sense).opacity(0.2))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Text("\(item.count)")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(getGroundingSenseColor(sense: item.sense))
+                                )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    // Start button
+                    Button(action: {
+                        LocalHapticFeedback.medium()
+                        startGroundingExercise()
+                    }) {
+                        HStack {
+                            Image(systemName: "hand.tap")
+                                .font(.system(size: 18))
+                            Text("Start Grounding Exercise")
+                                .font(AppTextStyles.h4)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(strategy.category.color)
+                        .cornerRadius(AppLayout.cornerRadius)
+                    }
+                }
+                .padding()
+                .background(AppColors.cardBackground)
+                .cornerRadius(AppLayout.cornerRadius)
+            } else {
+                // Active grounding exercise
+                VStack(spacing: 16) {
+                    if groundingStep < groundingItems.count {
+                        let item = groundingItems[groundingStep]
+                        
+                        // Sense icon and title
+                        HStack {
+                            Circle()
+                                .fill(getGroundingSenseColor(sense: item.sense).opacity(0.2))
+                                .frame(width: 60, height: 60)
+                                .overlay(
+                                    Image(systemName: getGroundingSenseIcon(sense: item.sense))
+                                        .font(.system(size: 24))
+                                        .foregroundColor(getGroundingSenseColor(sense: item.sense))
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.sense)
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(getGroundingSenseColor(sense: item.sense))
+                                
+                                if item.count > 1 {
+                                    Text("Find \(item.count) things")
+                                        .font(AppTextStyles.body2)
+                                        .foregroundColor(AppColors.textMedium)
+                                }
+                            }
+                            .padding(.leading, 8)
+                            
+                            Spacer()
+                            
+                            Text("\(groundingStep + 1)/\(groundingItems.count)")
+                                .font(AppTextStyles.body3)
+                                .foregroundColor(AppColors.textMedium)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(AppColors.cardBackground)
+                                .cornerRadius(12)
+                        }
+                        .padding(.vertical, 8)
+                        
+                        // Prompt
+                        Text(item.prompt)
+                            .font(AppTextStyles.h4)
+                            .foregroundColor(AppColors.textDark)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(getGroundingSenseColor(sense: item.sense).opacity(0.1))
+                            .cornerRadius(12)
+                        
+                        // Progress items for multi-count senses
+                        if item.count > 1 {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(1...item.count, id: \.self) { number in
+                                        Text("\(number)")
+                                            .font(.system(size: 18, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 36, height: 36)
+                                            .background(getGroundingSenseColor(sense: item.sense))
+                                            .cornerRadius(18)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        
+                        Spacer(minLength: 20)
+                        
+                        // Navigation buttons
+                        HStack {
+                            // Back button (if not first step)
+                            if groundingStep > 0 {
+                                Button(action: {
+                                    LocalHapticFeedback.light()
+                                    withAnimation {
+                                        groundingStep -= 1
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "chevron.left")
+                                        Text("Back")
+                                    }
+                                    .foregroundColor(AppColors.textMedium)
+                                    .padding()
+                                    .background(AppColors.cardBackground)
+                                    .cornerRadius(AppLayout.cornerRadius)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            // Next button
+                            Button(action: {
+                                LocalHapticFeedback.medium()
+                                withAnimation {
+                                    if groundingStep < groundingItems.count - 1 {
+                                        groundingStep += 1
+                                    } else {
+                                        completeGroundingExercise()
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    Text(groundingStep < groundingItems.count - 1 ? "Next" : "Complete")
+                                    Image(systemName: groundingStep < groundingItems.count - 1 ? "chevron.right" : "checkmark")
+                                }
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(strategy.category.color)
+                                .cornerRadius(AppLayout.cornerRadius)
+                            }
+                        }
+                    } else {
+                        // Completion view
+                        VStack(spacing: 24) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(strategy.category.color)
+                            
+                            Text("Exercise Complete")
+                                .font(AppTextStyles.h3)
+                                .foregroundColor(AppColors.textDark)
+                            
+                            Text("Take a moment to notice how you feel now.")
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(AppColors.textMedium)
+                                .multilineTextAlignment(.center)
+                            
+                            Button(action: {
+                                LocalHapticFeedback.medium()
+                                completeStrategy()
+                            }) {
+                                Text("Rate & Complete")
+                                    .font(AppTextStyles.h4)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(strategy.category.color)
+                                    .cornerRadius(AppLayout.cornerRadius)
+                            }
+                            
+                            Button(action: {
+                                LocalHapticFeedback.light()
+                                resetGroundingExercise()
+                            }) {
+                                Text("Start Over")
+                                    .font(AppTextStyles.body2)
+                                    .foregroundColor(AppColors.textMedium)
+                            }
+                        }
+                        .padding()
+                    }
+                }
+                .padding()
+                .background(AppColors.cardBackground)
+                .cornerRadius(AppLayout.cornerRadius)
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    private func startGroundingExercise() {
+        withAnimation {
+            showingGroundingExercise = true
+            groundingStep = 0
+        }
+    }
+    
+    private func completeGroundingExercise() {
+        // Exercise completed, show completion step
+        withAnimation {
+            groundingStep = groundingItems.count
+        }
+        LocalHapticFeedback.success()
+    }
+    
+    private func resetGroundingExercise() {
+        withAnimation {
+            groundingStep = 0
+        }
+    }
+    
+    private func getGroundingSenseColor(sense: String) -> Color {
+        switch sense.lowercased() {
+        case "see": return Color.blue
+        case "touch": return Color.green
+        case "hear": return Color.purple
+        case "smell": return Color.orange
+        case "taste": return Color.red
+        default: return AppColors.primary
+        }
+    }
+    
+    private func getGroundingSenseIcon(sense: String) -> String {
+        switch sense.lowercased() {
+        case "see": return "eye"
+        case "touch": return "hand.raised"
+        case "hear": return "ear"
+        case "smell": return "nose"
+        case "taste": return "mouth"
+        default: return "questionmark.circle"
+        }
+    }
+    
+    // MARK: - Journaling Exercise
+    private func setupJournalingExercise() {
+        // Extract prompts from strategy steps
+        journalPrompts = strategy.steps.filter { !$0.isEmpty }
+        
+        if journalPrompts.isEmpty {
+            // If no steps available, use generic prompts
+            journalPrompts = [
+                "What are you feeling right now? Describe any physical sensations or emotions.",
+                "What thoughts are going through your mind?",
+                "What triggered these feelings or thoughts?",
+                "How can you respond to this situation with self-compassion?",
+                "What's one small step you can take to move forward?"
+            ]
+        }
+    }
+    
+    private var journalingExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Journaling Exercise")
+                .font(AppTextStyles.h4)
+                .foregroundColor(AppColors.textDark)
+            
+            if !showingJournalExercise {
+                // Preview/start view
+                VStack(spacing: 16) {
+                    Text("Writing about your thoughts and feelings can help process emotions and gain clarity.")
+                        .font(AppTextStyles.body2)
+                        .foregroundColor(AppColors.textMedium)
+                    
+                    // Prompt preview
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("You'll reflect on:")
+                            .font(AppTextStyles.body3)
+                            .foregroundColor(AppColors.textDark)
+                        
+                        ForEach(journalPrompts.prefix(min(3, journalPrompts.count)), id: \.self) { prompt in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(AppColors.textMedium)
+                                    .padding(.top, 6)
+                                
+                                Text(prompt)
+                                    .font(AppTextStyles.body3)
+                                    .foregroundColor(AppColors.textMedium)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        if journalPrompts.count > 3 {
+                            Text("+ \(journalPrompts.count - 3) more prompts")
+                                .font(AppTextStyles.body3)
+                                .foregroundColor(AppColors.textLight)
+                                .padding(.leading, 16)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(strategy.category.color.opacity(0.1))
+                    .cornerRadius(8)
+                    
+                    // Start button
+                    Button(action: {
+                        LocalHapticFeedback.medium()
+                        startJournalingExercise()
+                    }) {
+                        HStack {
+                            Image(systemName: "pencil.and.outline")
+                                .font(.system(size: 18))
+                            Text("Start Journaling Exercise")
+                                .font(AppTextStyles.h4)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(strategy.category.color)
+                        .cornerRadius(AppLayout.cornerRadius)
+                    }
+                }
+                .padding()
+                .background(AppColors.cardBackground)
+                .cornerRadius(AppLayout.cornerRadius)
+            } else {
+                // Active journaling exercise
+                VStack(spacing: 16) {
+                    // Progress indicator
+                    HStack {
+                        Text("Prompt \(currentJournalPrompt + 1) of \(journalPrompts.count)")
+                            .font(AppTextStyles.body3)
+                            .foregroundColor(AppColors.textMedium)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            LocalHapticFeedback.light()
+                            saveJournalEntry()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.down.doc.fill")
+                                Text("Save")
+                            }
+                            .font(AppTextStyles.body3)
+                            .foregroundColor(strategy.category.color)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    
+                    // Prompt
+                    if currentJournalPrompt < journalPrompts.count {
+                        Text(journalPrompts[currentJournalPrompt])
+                            .font(AppTextStyles.h4)
+                            .foregroundColor(AppColors.textDark)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppColors.cardBackground.opacity(0.5))
+                            .cornerRadius(12)
+                    }
+                    
+                    // Journal text area
+                    TextEditor(text: $journalText)
+                        .font(AppTextStyles.body2)
+                        .padding()
+                        .frame(minHeight: 200)
+                        .background(AppColors.cardBackground.opacity(0.5))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppColors.textLight.opacity(0.3), lineWidth: 1)
+                        )
+                    
+                    // Navigation buttons
+                    HStack {
+                        // Back button (if not first prompt)
+                        if currentJournalPrompt > 0 {
+                            Button(action: {
+                                LocalHapticFeedback.light()
+                                moveToJournalPrompt(currentJournalPrompt - 1)
+                            }) {
+                                HStack {
+                                    Image(systemName: "chevron.left")
+                                    Text("Previous")
+                                }
+                                .foregroundColor(AppColors.textMedium)
+                                .padding()
+                                .background(AppColors.cardBackground)
+                                .cornerRadius(AppLayout.cornerRadius)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // Next button
+                        Button(action: {
+                            LocalHapticFeedback.medium()
+                            if currentJournalPrompt < journalPrompts.count - 1 {
+                                moveToJournalPrompt(currentJournalPrompt + 1)
+                            } else {
+                                completeJournalingExercise()
+                            }
+                        }) {
+                            HStack {
+                                Text(currentJournalPrompt < journalPrompts.count - 1 ? "Next" : "Complete")
+                                Image(systemName: currentJournalPrompt < journalPrompts.count - 1 ? "chevron.right" : "checkmark")
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(strategy.category.color)
+                            .cornerRadius(AppLayout.cornerRadius)
+                        }
+                        .disabled(journalText.isEmpty)
+                        .opacity(journalText.isEmpty ? 0.6 : 1)
+                    }
+                }
+                .padding()
+                .background(AppColors.cardBackground)
+                .cornerRadius(AppLayout.cornerRadius)
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    private func startJournalingExercise() {
+        withAnimation {
+            showingJournalExercise = true
+            currentJournalPrompt = 0
+            journalText = ""
+        }
+    }
+    
+    private func moveToJournalPrompt(_ promptIndex: Int) {
+        if promptIndex >= 0 && promptIndex < journalPrompts.count {
+            // Save current entry
+            saveJournalEntry()
+            
+            // Move to new prompt
+            withAnimation {
+                currentJournalPrompt = promptIndex
+                journalText = ""
+            }
+        }
+    }
+    
+    private func saveJournalEntry() {
+        // In a real app, this would save to a journal database
+        // For now, just provide feedback
+        if !journalText.isEmpty {
+            LocalHapticFeedback.success()
+        }
+    }
+    
+    private func completeJournalingExercise() {
+        saveJournalEntry()
+        LocalHapticFeedback.success()
+        completeStrategy()
+    }
+    
+    // MARK: - Meditation Exercise
+    private var meditationExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Meditation")
+                .font(AppTextStyles.h4)
+                .foregroundColor(AppColors.textDark)
+            
+            // Meditation timer setup
+            VStack(spacing: 16) {
+                // Ambience options
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ambience")
+                        .font(AppTextStyles.body2)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(["None", "Rain", "Ocean", "Forest", "White Noise"], id: \.self) { sound in
+                                Button(action: {
+                                    LocalHapticFeedback.light()
+                                    // Would play the selected sound
+                                }) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: getSoundIcon(sound))
+                                            .font(.system(size: 20))
+                                            .foregroundColor(sound == "None" ? AppColors.textMedium : strategy.category.color)
+                                        
+                                        Text(sound)
+                                            .font(AppTextStyles.body3)
+                                    }
+                                    .frame(width: 70, height: 70)
+                                    .background(AppColors.cardBackground.opacity(0.5))
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                }
+                
+                // Interval bell options
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Interval Bell")
+                        .font(AppTextStyles.body2)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    HStack {
+                        ForEach(["None", "1 min", "3 min", "5 min"], id: \.self) { interval in
+                            Button(action: {
+                                LocalHapticFeedback.light()
+                                // Would set the interval bell
+                            }) {
+                                Text(interval)
+                                    .font(AppTextStyles.body3)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(AppColors.cardBackground.opacity(0.5))
+                                    .cornerRadius(8)
+                            }
+                        }
+                    }
+                }
+                
+                // Start meditation button
+                Button(action: {
+                    LocalHapticFeedback.medium()
+                    startTimer()
+                }) {
+                    HStack {
+                        Image(systemName: "moon.stars")
+                            .font(.system(size: 18))
+                        Text("Begin Meditation")
+                            .font(AppTextStyles.h4)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(strategy.category.color)
+                    .cornerRadius(AppLayout.cornerRadius)
+                }
+            }
+            .padding()
+            .background(AppColors.cardBackground)
+            .cornerRadius(AppLayout.cornerRadius)
+        }
+        .padding(.top, 8)
+    }
+    
+    private func getSoundIcon(_ sound: String) -> String {
+        switch sound {
+        case "Rain": return "cloud.rain"
+        case "Ocean": return "water.waves"
+        case "Forest": return "leaf"
+        case "White Noise": return "waveform"
+        default: return "speaker.slash"
+        }
+    }
+    
+    // MARK: - Helper Methods
+    struct GroundingItem {
+        let sense: String
+        let count: Int
+        let prompt: String
+    }
+    
+    enum StrategyType {
+        case breathing
+        case grounding
+        case journaling
+        case meditation
+        case standard
     }
     
     // MARK: - Header Section
@@ -814,85 +1571,6 @@ struct EnhancedStrategyDetailView: View {
         .padding()
         .background(AppColors.cardBackground)
         .cornerRadius(AppLayout.cornerRadius)
-    }
-    
-    // MARK: - Mood Check-In View
-    private var moodCheckInView: some View {
-        VStack(spacing: 24) {
-            // Header
-            Text("How are you feeling?")
-                .font(AppTextStyles.h3)
-                .foregroundColor(AppColors.textDark)
-            
-            Text("Before you start, let's check in with your current mood")
-                .font(AppTextStyles.body2)
-                .foregroundColor(AppColors.textMedium)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            // Mood selection
-            VStack(alignment: .leading, spacing: 12) {
-                Text("My mood is...")
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textDark)
-                
-                TextField("e.g. anxious, stressed, sad", text: $moodBefore)
-                    .padding()
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
-                
-                Text("Intensity: \(Int(moodIntensityBefore))")
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textDark)
-                
-                // Breaking up the complex expression
-                let sliderColor = moodIntensityColor(intensity: moodIntensityBefore)
-                Slider(value: $moodIntensityBefore, in: 1...5, step: 1)
-                    .accentColor(sliderColor)
-                    .onChange(of: moodIntensityBefore) { _ in
-                        LocalHapticFeedback.selection()
-                    }
-                
-                HStack {
-                    Text("Mild")
-                        .font(AppTextStyles.body3)
-                        .foregroundColor(AppColors.textLight)
-                    
-                    Spacer()
-                    
-                    Text("Intense")
-                        .font(AppTextStyles.body3)
-                        .foregroundColor(AppColors.textLight)
-                }
-            }
-            .padding()
-            
-            // Continue button
-            Button(action: {
-                LocalHapticFeedback.medium()
-                showingMoodCheckIn = false
-            }) {
-                Text("Start Strategy")
-                    .font(AppTextStyles.h4)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(AppColors.primary)
-                    .cornerRadius(AppLayout.cornerRadius)
-            }
-            .disabled(moodBefore.isEmpty)
-            .opacity(moodBefore.isEmpty ? 0.6 : 1)
-            
-            Button(action: {
-                showingMoodCheckIn = false
-            }) {
-                Text("Skip")
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textMedium)
-            }
-            .padding()
-        }
-        .padding()
     }
     
     // MARK: - Steps Section
@@ -1433,11 +2111,646 @@ struct EnhancedStrategyDetailView: View {
             return AppColors.textLight
         }
     }
+    
+    // MARK: - Mood Check-In View
+    private var moodCheckInView: some View {
+        VStack(spacing: 24) {
+            // Header
+            Text("How are you feeling?")
+                .font(AppTextStyles.h3)
+                .foregroundColor(AppColors.textDark)
+            
+            Text("Before you start, let's check in with your current mood")
+                .font(AppTextStyles.body2)
+                .foregroundColor(AppColors.textMedium)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            // Mood selection
+            VStack(alignment: .leading, spacing: 12) {
+                Text("My mood is...")
+                    .font(AppTextStyles.body2)
+                    .foregroundColor(AppColors.textDark)
+                
+                TextField("e.g. anxious, stressed, sad", text: $moodBefore)
+                    .padding()
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(8)
+                
+                Text("Intensity: \(Int(moodIntensityBefore))")
+                    .font(AppTextStyles.body2)
+                    .foregroundColor(AppColors.textDark)
+                
+                // Breaking up the complex expression
+                let sliderColor = moodIntensityColor(intensity: moodIntensityBefore)
+                Slider(value: $moodIntensityBefore, in: 1...5, step: 1)
+                    .accentColor(sliderColor)
+                    .onChange(of: moodIntensityBefore) { _ in
+                        LocalHapticFeedback.selection()
+                    }
+                
+                HStack {
+                    Text("Mild")
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textLight)
+                    
+                    Spacer()
+                    
+                    Text("Intense")
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textLight)
+                }
+            }
+            .padding()
+            
+            // Continue button
+            Button(action: {
+                LocalHapticFeedback.medium()
+                showingMoodCheckIn = false
+            }) {
+                Text("Start Strategy")
+                    .font(AppTextStyles.h4)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(AppColors.primary)
+                    .cornerRadius(AppLayout.cornerRadius)
+            }
+            .disabled(moodBefore.isEmpty)
+            .opacity(moodBefore.isEmpty ? 0.6 : 1)
+            
+            Button(action: {
+                showingMoodCheckIn = false
+            }) {
+                Text("Skip")
+                    .font(AppTextStyles.body2)
+                    .foregroundColor(AppColors.textMedium)
+            }
+            .padding()
+        }
+        .padding()
+    }
+    
+    // MARK: - Breathing Exercise
+    private var breathingExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Guided Breathing")
+                .font(AppTextStyles.h4)
+                .foregroundColor(AppColors.textDark)
+            
+            if !showingBreathingExercise {
+                // Preview/start view
+                VStack(spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Breathing pattern")
+                                .font(AppTextStyles.body2)
+                                .foregroundColor(AppColors.textDark)
+                            
+                            // Breathing pattern selection
+                            Picker("Pattern", selection: $breathingPattern) {
+                                Text("4-7-8").tag(BreathingPattern.fourSevenEight)
+                                Text("Box (4-4-4-4)").tag(BreathingPattern.box)
+                                Text("Deep (5-2-5)").tag(BreathingPattern.deep)
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .onChange(of: breathingPattern) { _ in
+                                LocalHapticFeedback.selection()
+                            }
+                        }
+                    }
+                    
+                    // Pattern description
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(breathingPattern.title)
+                            .font(AppTextStyles.body2)
+                            .foregroundColor(AppColors.textDark)
+                        
+                        Text(breathingPattern.description)
+                            .font(AppTextStyles.body3)
+                            .foregroundColor(AppColors.textMedium)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(strategy.category.color.opacity(0.1))
+                    .cornerRadius(8)
+                    
+                    // Start button
+                    Button(action: {
+                        LocalHapticFeedback.medium()
+                        startBreathingExercise()
+                    }) {
+                        HStack {
+                            Image(systemName: "lungs.fill")
+                                .font(.system(size: 18))
+                            Text("Start Breathing Exercise")
+                                .font(AppTextStyles.h4)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(strategy.category.color)
+                        .cornerRadius(AppLayout.cornerRadius)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding()
+                .background(AppColors.cardBackground)
+                .cornerRadius(AppLayout.cornerRadius)
+            } else {
+                // Active breathing exercise
+                VStack(spacing: 20) {
+                    // Breathing visualization
+                    ZStack {
+                        // Outer circle
+                        Circle()
+                            .stroke(strategy.category.color.opacity(0.3), lineWidth: 8)
+                            .frame(width: 250, height: 250)
+                        
+                        // Animated breathing circle
+                        Circle()
+                            .fill(strategy.category.color.opacity(breathingOpacity))
+                            .frame(width: 220, height: 220)
+                            .scaleEffect(breathingScale)
+                            .animation(.easeInOut(duration: breathingPhase.duration), value: breathingScale)
+                        
+                        // Instruction text
+                        VStack(spacing: 8) {
+                            Text(breathingPhase.instruction)
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(.white)
+                                .padding(.bottom, 4)
+                            
+                            Text("\(Int(breathingPhase.timeRemaining))")
+                                .font(.system(size: 42, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .id(breathingPhase.id) // Force redraw when phase changes
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                    
+                    // Progress indicators
+                    VStack(spacing: 16) {
+                        // Breath counter
+                        Text("Breath \(breathingCycleCount)/7")
+                            .font(AppTextStyles.body2)
+                            .foregroundColor(AppColors.textMedium)
+                        
+                        // Phase visualizer
+                        HStack(spacing: 0) {
+                            phaseIndicator(
+                                phase: .inhale,
+                                width: CGFloat(breathingPattern.inhaleTime) / CGFloat(breathingPattern.totalCycleTime)
+                            )
+                            
+                            if breathingPattern.holdTime > 0 {
+                                phaseIndicator(
+                                    phase: .hold,
+                                    width: CGFloat(breathingPattern.holdTime) / CGFloat(breathingPattern.totalCycleTime)
+                                )
+                            }
+                            
+                            phaseIndicator(
+                                phase: .exhale,
+                                width: CGFloat(breathingPattern.exhaleTime) / CGFloat(breathingPattern.totalCycleTime)
+                            )
+                            
+                            if breathingPattern.holdAfterExhaleTime > 0 {
+                                phaseIndicator(
+                                    phase: .holdAfterExhale,
+                                    width: CGFloat(breathingPattern.holdAfterExhaleTime) / CGFloat(breathingPattern.totalCycleTime)
+                                )
+                            }
+                        }
+                        .frame(height: 8)
+                        .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    
+                    // Control buttons
+                    HStack(spacing: 30) {
+                        // Reset button
+                        Button(action: {
+                            LocalHapticFeedback.medium()
+                            resetBreathingExercise()
+                        }) {
+                            VStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.white)
+                                
+                                Text("Reset")
+                                    .font(AppTextStyles.body3)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        // Stop button
+                        Button(action: {
+                            LocalHapticFeedback.medium()
+                            stopBreathingExercise()
+                        }) {
+                            VStack {
+                                Image(systemName: "xmark.circle")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.white)
+                                
+                                Text("End")
+                                    .font(AppTextStyles.body3)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .padding(.top, 20)
+                }
+                .padding(.vertical, 24)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            strategy.category.color.opacity(0.9),
+                            strategy.category.color.opacity(0.7)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .cornerRadius(AppLayout.cornerRadius)
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    // Helper function to create phase indicator for breathing visualization
+    private func phaseIndicator(phase: BreathingPhase, width: CGFloat) -> some View {
+        Rectangle()
+            .fill(breathingPhase == phase ? Color.white : Color.white.opacity(0.3))
+            .frame(width: max(width * 200, 20))
+    }
+    
+    // MARK: - Breathing Exercise Functions
+    private func startBreathingExercise() {
+        showingBreathingExercise = true
+        breathingCycleCount = 1
+        startBreathingCycle()
+    }
+    
+    private func startBreathingCycle() {
+        // Start with inhale
+        startBreathingPhase(.inhale)
+    }
+    
+    private func startBreathingPhase(_ phase: BreathingPhase) {
+        breathingPhase = phase
+        
+        // Update animation based on phase
+        switch phase {
+        case .inhale:
+            // Expand the circle
+            withAnimation(.easeIn(duration: breathingPattern.inhaleTime)) {
+                breathingScale = 1.4
+                breathingOpacity = 0.6
+            }
+            
+            // Provide light haptic feedback at beginning of inhale
+            LocalHapticFeedback.light()
+            
+            // Schedule next phase
+            scheduleNextPhase(after: breathingPattern.inhaleTime, nextPhase: breathingPattern.holdTime > 0 ? .hold : .exhale)
+            
+        case .hold:
+            // Keep circle expanded but change opacity slightly
+            withAnimation(.easeInOut(duration: 0.5)) {
+                breathingOpacity = 0.7
+            }
+            
+            // Schedule next phase
+            scheduleNextPhase(after: breathingPattern.holdTime, nextPhase: .exhale)
+            
+        case .exhale:
+            // Contract the circle
+            withAnimation(.easeOut(duration: breathingPattern.exhaleTime)) {
+                breathingScale = 1.0
+                breathingOpacity = 0.8
+            }
+            
+            // Provide medium haptic feedback at beginning of exhale
+            LocalHapticFeedback.light()
+            
+            // Schedule next phase
+            if breathingPattern.holdAfterExhaleTime > 0 {
+                scheduleNextPhase(after: breathingPattern.exhaleTime, nextPhase: .holdAfterExhale)
+            } else {
+                scheduleNextPhase(after: breathingPattern.exhaleTime, nextPhase: breathingCycleCount < 7 ? .inhale : .complete)
+            }
+            
+        case .holdAfterExhale:
+            // Keep circle contracted
+            withAnimation(.easeInOut(duration: 0.5)) {
+                breathingOpacity = 0.9
+            }
+            
+            // Schedule next phase
+            scheduleNextPhase(after: breathingPattern.holdAfterExhaleTime, nextPhase: breathingCycleCount < 7 ? .inhale : .complete)
+            
+        case .complete:
+            // Exercise complete
+            withAnimation {
+                breathingOpacity = 1.0
+            }
+            
+            // Provide success haptic feedback
+            LocalHapticFeedback.success()
+            
+            // End exercise after a brief pause
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                stopBreathingExercise()
+            }
+        }
+    }
+    
+    private func scheduleNextPhase(after seconds: Double, nextPhase: BreathingPhase) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+            if showingBreathingExercise {
+                if nextPhase == .inhale && breathingCycleCount < 7 {
+                    breathingCycleCount += 1
+                }
+                
+                startBreathingPhase(nextPhase)
+            }
+        }
+    }
+    
+    private func resetBreathingExercise() {
+        stopBreathingExercise()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            startBreathingExercise()
+        }
+    }
+    
+    private func stopBreathingExercise() {
+        showingBreathingExercise = false
+        breathingCycleCount = 0
+        
+        // Reset animation values
+        withAnimation {
+            breathingScale = 1.0
+            breathingOpacity = 0.8
+        }
+    }
+}
+
+// MARK: - Strategy List View
+struct StrategyListView: View {
+    let title: String
+    let strategies: [LocalCopingStrategyDetail]
+    let onStrategySelected: (LocalCopingStrategyDetail) -> Void
+    
+    @Environment(\.presentationMode) var presentationMode
+    @StateObject private var strategyStore = LocalStrategyEffectivenessStore.shared
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                AppColors.background
+                    .ignoresSafeArea()
+                
+                if strategies.isEmpty {
+                    emptyView
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(strategies) { strategy in
+                                strategyListItem(strategy)
+                                    .onTapGesture {
+                                        onStrategySelected(strategy)
+                                    }
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(AppColors.textDark)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var emptyView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 50))
+                .foregroundColor(AppColors.textLight.opacity(0.5))
+            
+            Text("No strategies found")
+                .font(AppTextStyles.h3)
+                .foregroundColor(AppColors.textDark)
+            
+            Text("Try adjusting your filters or categories")
+                .font(AppTextStyles.body2)
+                .foregroundColor(AppColors.textMedium)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+    
+    private func strategyListItem(_ strategy: LocalCopingStrategyDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                // Category icon
+                ZStack {
+                    Circle()
+                        .fill(strategy.category.color.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: strategy.category.iconName)
+                        .font(.system(size: 16))
+                        .foregroundColor(strategy.category.color)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(strategy.title)
+                        .font(AppTextStyles.h4)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    Text(strategy.description)
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textMedium)
+                        .lineLimit(2)
+                    
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 12))
+                            Text(strategy.timeToComplete)
+                                .font(AppTextStyles.body3)
+                        }
+                        .foregroundColor(AppColors.textMedium)
+                        
+                        Spacer()
+                        
+                        if strategyStore.getAverageRating(for: strategy.title) > 0 {
+                            HStack(spacing: 2) {
+                                Text(String(format: "%.1f", strategyStore.getAverageRating(for: strategy.title)))
+                                    .font(AppTextStyles.body3)
+                                
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(.yellow)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.leading, 8)
+                
+                Spacer()
+                
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppColors.textLight)
+            }
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .cornerRadius(AppLayout.cornerRadius)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
+    }
 }
 
 // MARK: - Preview Provider
 struct EnhancedCopingStrategiesLibraryView_Previews: PreviewProvider {
     static var previews: some View {
         EnhancedCopingStrategiesLibraryView()
+    }
+}
+
+// MARK: - Breathing Pattern Model
+enum BreathingPattern: Int, CaseIterable {
+    case fourSevenEight
+    case box
+    case deep
+    
+    var title: String {
+        switch self {
+        case .fourSevenEight:
+            return "4-7-8 Breathing"
+        case .box:
+            return "Box Breathing"
+        case .deep:
+            return "Deep Breathing"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .fourSevenEight:
+            return "Inhale for 4 seconds, hold for 7 seconds, exhale for 8 seconds. This pattern has calming effects on the nervous system."
+        case .box:
+            return "Inhale for 4 seconds, hold for 4 seconds, exhale for 4 seconds, hold for 4 seconds. This creates a balanced, stabilizing breath."
+        case .deep:
+            return "Inhale deeply for 5 seconds, hold briefly for 2 seconds, exhale fully for 5 seconds. Focus on filling and emptying the lungs completely."
+        }
+    }
+    
+    var inhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 4.0
+        case .box: return 4.0
+        case .deep: return 5.0
+        }
+    }
+    
+    var holdTime: Double {
+        switch self {
+        case .fourSevenEight: return 7.0
+        case .box: return 4.0
+        case .deep: return 2.0
+        }
+    }
+    
+    var exhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 8.0
+        case .box: return 4.0
+        case .deep: return 5.0
+        }
+    }
+    
+    var holdAfterExhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 0.0
+        case .box: return 4.0
+        case .deep: return 0.0
+        }
+    }
+    
+    var totalCycleTime: Double {
+        return inhaleTime + holdTime + exhaleTime + holdAfterExhaleTime
+    }
+}
+
+// MARK: - Breathing Phase Model
+enum BreathingPhase: Equatable {
+    case inhale
+    case hold
+    case exhale
+    case holdAfterExhale
+    case complete
+    
+    var instruction: String {
+        switch self {
+        case .inhale: return "Inhale"
+        case .hold: return "Hold"
+        case .exhale: return "Exhale"
+        case .holdAfterExhale: return "Hold"
+        case .complete: return "Complete"
+        }
+    }
+    
+    var duration: Double {
+        switch self {
+        case .inhale: return 4.0
+        case .hold: return 7.0
+        case .exhale: return 8.0
+        case .holdAfterExhale: return 4.0
+        case .complete: return 1.0
+        }
+    }
+    
+    var timeRemaining: Double {
+        switch self {
+        case .inhale: return 4.0
+        case .hold: return 7.0
+        case .exhale: return 8.0
+        case .holdAfterExhale: return 4.0
+        case .complete: return 0.0
+        }
+    }
+    
+    var id: String {
+        switch self {
+        case .inhale: return "inhale"
+        case .hold: return "hold"
+        case .exhale: return "exhale"
+        case .holdAfterExhale: return "holdAfterExhale"
+        case .complete: return "complete"
+        }
     }
 } 
