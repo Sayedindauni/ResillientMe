@@ -26,18 +26,18 @@ extension View {
 
 struct MoodJournalView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @ObservedObject var moodAnalysisEngine: MoodAnalysisEngine
-    @StateObject private var moodStore: CoreDataMoodStore
+    @ObservedObject var moodAnalysisEngine: ResilientMe.MoodAnalysisEngine
+    @StateObject private var moodStore: ResilientMe.CoreDataMoodStore
     
     // Shared state
     @State private var activeTab: ViewTab = .journal
     @State private var showAddNewEntry = false
     
     // Journal states
-    @State private var journalEntries: [JournalEntryModel] = SampleData.journalEntries
+    @State private var journalEntries: [JournalEntryModel] = LocalSampleData.journalEntries
     @State private var selectedEntry: JournalEntryModel? = nil
     @State private var searchText = ""
-    @State private var filterOption: FilterOption = .all
+    @State private var filterOption: LocalFilterOption = .all
     
     // Mood states
     @State private var selectedMood: String?
@@ -56,9 +56,9 @@ struct MoodJournalView: View {
     }
     
     // Initializer with context
-    init(context: NSManagedObjectContext, moodAnalysisEngine: MoodAnalysisEngine) {
+    init(context: NSManagedObjectContext, moodAnalysisEngine: ResilientMe.MoodAnalysisEngine) {
         self.moodAnalysisEngine = moodAnalysisEngine
-        self._moodStore = StateObject(wrappedValue: CoreDataMoodStore(context: context))
+        self._moodStore = StateObject(wrappedValue: ResilientMe.CoreDataMoodStore(context: context))
     }
     
     var body: some View {
@@ -180,8 +180,8 @@ struct MoodJournalView: View {
             // Filter options
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(FilterOption.allCases) { option in
-                        FilterButton(
+                    ForEach(LocalFilterOption.allCases) { option in
+                        LocalFilterButton(
                             title: option.title,
                             isSelected: filterOption == option,
                             action: { filterOption = option }
@@ -402,7 +402,7 @@ struct MoodJournalView: View {
     private var entriesList: some View {
         LazyVStack(spacing: 12) {
             ForEach(filteredEntries) { entry in
-                JournalEntryRow(entry: entry)
+                LocalJournalEntryRow(entry: entry)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedEntry = entry
@@ -618,13 +618,12 @@ struct MoodJournalView: View {
         guard let mood = selectedMood else { return }
         
         // Save mood entry to mood store
-        let entry = MoodData(
+        let entry = ResilientMe.MoodData(
             id: UUID().uuidString,
             date: Date(),
             mood: mood,
             intensity: moodIntensity,
-            note: moodNote.isEmpty ? nil : moodNote,
-            isRejectionRelated: isRejectionRelated
+            note: moodNote.isEmpty ? nil : moodNote
         )
         
         moodStore.addMoodEntry(entry)
@@ -637,13 +636,12 @@ struct MoodJournalView: View {
         guard let mood = selectedMood else { return }
         
         // Save mood entry
-        let entry = MoodData(
+        let entry = ResilientMe.MoodData(
             id: UUID().uuidString,
             date: Date(),
             mood: mood,
             intensity: moodIntensity,
-            note: moodNote.isEmpty ? nil : moodNote,
-            isRejectionRelated: isRejectionRelated
+            note: moodNote.isEmpty ? nil : moodNote
         )
         
         moodStore.addMoodEntry(entry)
@@ -753,7 +751,7 @@ struct MoodJournalView: View {
         let intensity: Int?
         
         // Create from mood entry
-        static func fromMood(_ moodEntry: MoodData) -> CombinedHistoryEntry {
+        static func fromMood(_ moodEntry: ResilientMe.MoodData) -> CombinedHistoryEntry {
             return CombinedHistoryEntry(
                 id: moodEntry.id,
                 date: moodEntry.date,
@@ -800,22 +798,23 @@ struct MoodJournalView: View {
 
 // MARK: - Supporting Views
 
-struct FilterOption: Identifiable, CaseIterable {
+// Rename to avoid conflicts with ResilientMe
+struct LocalFilterOption: Identifiable, CaseIterable {
     let id: String
     let title: String
     
-    static let all = FilterOption(id: "all", title: "All")
-    static let rejections = FilterOption(id: "rejections", title: "Rejections")
-    static let insights = FilterOption(id: "insights", title: "Insights")
-    static let gratitude = FilterOption(id: "gratitude", title: "Gratitude")
-    static let habits = FilterOption(id: "habits", title: "Habits")
+    static let all = LocalFilterOption(id: "all", title: "All")
+    static let rejections = LocalFilterOption(id: "rejections", title: "Rejections")
+    static let insights = LocalFilterOption(id: "insights", title: "Insights")
+    static let gratitude = LocalFilterOption(id: "gratitude", title: "Gratitude")
+    static let habits = LocalFilterOption(id: "habits", title: "Habits")
     
-    static var allCases: [FilterOption] {
+    static var allCases: [LocalFilterOption] {
         [.all, .rejections, .insights, .gratitude, .habits]
     }
 }
 
-struct FilterButton: View {
+struct LocalFilterButton: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -833,7 +832,7 @@ struct FilterButton: View {
     }
 }
 
-struct JournalEntryRow: View {
+struct LocalJournalEntryRow: View {
     let entry: JournalEntryModel
     
     var body: some View {
@@ -890,16 +889,7 @@ struct JournalEntryRow: View {
 
 // MARK: - Sample Data
 
-struct MoodData: Identifiable {
-    let id: String
-    let date: Date
-    let mood: String
-    let intensity: Int
-    let note: String?
-    let isRejectionRelated: Bool
-}
-
-struct SampleData {
+struct LocalSampleData {
     static var journalEntries: [JournalEntryModel] = [
         JournalEntryModel(
             id: "1",
@@ -929,58 +919,4 @@ struct SampleData {
             moodIntensity: 3
         )
     ]
-}
-
-// CoreDataMoodStore definition to avoid extra dependencies
-class CoreDataMoodStore: ObservableObject {
-    @Published var moodEntries: [MoodData] = []
-    
-    init(context: NSManagedObjectContext) {
-        // In a real implementation, this would load from CoreData
-        // For now, just load some sample data
-        loadSampleData()
-    }
-    
-    func addMoodEntry(_ entry: MoodData) {
-        moodEntries.append(entry)
-        // In a real implementation, this would save to CoreData
-    }
-    
-    private func loadSampleData() {
-        moodEntries = [
-            MoodData(
-                id: UUID().uuidString,
-                date: Date().addingTimeInterval(-43200), // 12 hours ago
-                mood: "Anxious",
-                intensity: 4,
-                note: "Feeling nervous about my presentation tomorrow",
-                isRejectionRelated: false
-            ),
-            MoodData(
-                id: UUID().uuidString,
-                date: Date().addingTimeInterval(-129600), // 36 hours ago
-                mood: "Good",
-                intensity: 4,
-                note: "Had a productive day and a nice walk",
-                isRejectionRelated: false
-            ),
-            MoodData(
-                id: UUID().uuidString,
-                date: Date().addingTimeInterval(-345600), // 4 days ago
-                mood: "Sad",
-                intensity: 3,
-                note: "Got a rejection from the job I applied for",
-                isRejectionRelated: true
-            )
-        ]
-    }
-}
-
-// Simple MoodAnalysisEngine for demonstration
-class MoodAnalysisEngine: ObservableObject {
-    var aiInitialized: Bool = true
-    
-    init(moodStore: CoreDataMoodStore) {
-        // Would normally analyze mood data here
-    }
 } 

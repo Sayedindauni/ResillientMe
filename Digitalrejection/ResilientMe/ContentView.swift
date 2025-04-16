@@ -23,17 +23,17 @@ typealias AppHapticFeedback = LocalAppHapticFeedback
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var dailyAffirmation = LocalAppCopy.randomAffirmation()
-    @StateObject private var moodStore: CoreDataMoodStore
-    @StateObject private var moodAnalysisEngine: MoodAnalysisEngine
+    @StateObject private var moodStore: ResilientMe.CoreDataMoodStore
+    @StateObject private var moodAnalysisEngine: ResilientMe.MoodAnalysisEngine
     @State private var selectedTab = 0
     
     // Add initializer to accept context parameter
     init(context: NSManagedObjectContext) {
         // The context is passed but not directly stored
         // as we're using @Environment for it
-        let moodStore = CoreDataMoodStore(context: context)
+        let moodStore = ResilientMe.CoreDataMoodStore(context: context)
         _moodStore = StateObject(wrappedValue: moodStore)
-        _moodAnalysisEngine = StateObject(wrappedValue: MoodAnalysisEngine(moodStore: moodStore))
+        _moodAnalysisEngine = StateObject(wrappedValue: ResilientMe.MoodAnalysisEngine(moodStore: moodStore))
     }
     
     var body: some View {
