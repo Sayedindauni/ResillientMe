@@ -250,6 +250,7 @@ enum AppCopingStrategyCategory: String, CaseIterable, Identifiable {
     case physical = "Physical"
     case social = "Social"
     case creative = "Creative"
+    case selfCare = "Self-Care"
     
     var id: String { rawValue }
     
@@ -260,6 +261,7 @@ enum AppCopingStrategyCategory: String, CaseIterable, Identifiable {
         case .physical: return Color.green
         case .social: return Color.purple
         case .creative: return Color.orange
+        case .selfCare: return Color.pink
         }
     }
     
@@ -270,6 +272,7 @@ enum AppCopingStrategyCategory: String, CaseIterable, Identifiable {
         case .physical: return "figure.walk"
         case .social: return "person.2"
         case .creative: return "paintbrush"
+        case .selfCare: return "heart.circle"
         }
     }
 }
@@ -509,8 +512,24 @@ struct DashboardView: View {
     @State private var showingStrategyDetail = false
     @State private var searchText = ""
     
-    // Add state variable for showing all strategies
+    // State variables for sheet presentations
+    @State private var showingDailyInfo = false
+    @State private var showingQuotesView = false
+    @State private var showingActivityDetail = false
+    @State private var showingStreaksDetail = false
     @State private var showingAllStrategies = false
+    @State private var selectedCategoryFilter: LocalCopingStrategyCategory?
+    
+    // Define ResillienceActivity struct
+    struct ResillienceActivity: Identifiable {
+        let id = UUID()
+        let title: String
+        let description: String
+        let iconName: String
+    }
+    
+    @State private var selectedActivity: ResillienceActivity?
+    @State private var selectedQuote: String = ""
     
     init() {
         let strategy = getRandomCopingStrategy()
@@ -788,11 +807,8 @@ struct DashboardView: View {
                 Spacer()
                 
                 Button(action: {
-                    // Post a notification to switch to the Strategies tab
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("SwitchToStrategiesTab"),
-                        object: nil
-                    )
+                    // Show all strategies in a sheet instead of switching tabs
+                    showingAllStrategies = true
                 }) {
                     Text("View All")
                         .font(AppTextStyles.body3)
@@ -800,10 +816,39 @@ struct DashboardView: View {
                 }
             }
             
+            // Category filters for quick access
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(LocalCopingStrategyCategory.allCases) { category in
+                        Button(action: {
+                            // Set category filter and show all strategies
+                            selectedCategoryFilter = category
+                            showingAllStrategies = true
+                        }) {
+                            HStack {
+                                Image(systemName: category.iconName)
+                                    .font(.system(size: 12))
+                                
+                                Text(category.displayName)
+                                    .font(AppTextStyles.body3)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(category.color.opacity(0.1))
+                            )
+                            .foregroundColor(category.color)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            
             // Featured strategies - just show a few highlighted ones
             VStack(alignment: .leading, spacing: 16) {
                 // Recently used or recommended strategies
-            if !recentlyUsedStrategies.isEmpty {
+                if !recentlyUsedStrategies.isEmpty {
                     Text("Recently Used")
                         .font(AppTextStyles.h4)
                         .foregroundColor(AppColors.textDark)
@@ -820,15 +865,15 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.bottom, 8)
-            }
+                }
             
                 // Quick strategies section - just a few examples
                 Text("Quick Relief")
                 .font(AppTextStyles.h4)
                 .foregroundColor(AppColors.textDark)
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
                         let quickStrategies = getStrategiesByTime(minutes: 5, includeUnder: true).prefix(3)
                         ForEach(Array(quickStrategies)) { strategy in
                             strategyCard(strategy)
@@ -851,11 +896,15 @@ struct DashboardView: View {
                 strategyDetailView(strategy)
             }
         }
-        .sheet(isPresented: $showingAllStrategies) {
-            StrategiesOverviewView(
-                recentlyUsedStrategies: recentlyUsedStrategies,
+        .sheet(isPresented: $showingAllStrategies, onDismiss: {
+            // Reset the category filter when the sheet is dismissed
+            selectedCategoryFilter = nil
+        }) {
+            // Use a more comprehensive strategies view
+            DashboardStrategiesView(
+                initialCategory: selectedCategoryFilter,
                 onStrategySelected: { strategy in
-                    selectedStrategy = strategy
+                    selectedStrategy = convertToAppStrategy(strategy)
                     showingAllStrategies = false
                     showingStrategyDetail = true
                 }
@@ -1842,6 +1891,36 @@ struct DashboardView: View {
             return "Breathing complete"
         }
     }
+    
+    // Helper method to convert LocalCopingStrategyDetail to AppCopingStrategyDetail
+    private func convertToAppStrategy(_ localStrategy: LocalCopingStrategyDetail) -> AppCopingStrategyDetail {
+        // Find an existing AppCopingStrategyDetail with the same title if possible
+        if let existingStrategy = AppCopingStrategiesLibrary.shared.strategies.first(where: { $0.title == localStrategy.title }) {
+            return existingStrategy
+        }
+        
+        // Create a new AppCopingStrategyDetail based on the local strategy
+        // Note: This assumes that AppCopingStrategyDetail has a similar structure to LocalCopingStrategyDetail
+        return AppCopingStrategyDetail(
+            title: localStrategy.title,
+            description: localStrategy.description,
+            category: convertLocalToAppCategory(localStrategy.category),
+            steps: localStrategy.steps,
+            timeToComplete: localStrategy.timeToComplete
+        )
+    }
+    
+    // Helper method to convert LocalCopingStrategyCategory to AppCopingStrategyCategory
+    private func convertLocalToAppCategory(_ localCategory: LocalCopingStrategyCategory) -> AppCopingStrategyCategory {
+        switch localCategory {
+        case .mindfulness: return .mindfulness
+        case .cognitive: return .cognitive
+        case .physical: return .physical
+        case .social: return .social
+        case .creative: return .creative
+        case .selfCare: return .selfCare
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -2480,5 +2559,384 @@ func getRandomCopingStrategy() -> (title: String, description: String) {
     
     let randomIndex = Int.random(in: 0..<min(titles.count, descriptions.count))
     return (titles[randomIndex], descriptions[randomIndex])
+}
+
+// MARK: - Dashboard Strategies View
+struct DashboardStrategiesView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var strategyStore = LocalStrategyEffectivenessStore.shared
+    
+    @State private var strategiesLibrary = LocalCopingStrategiesLibrary.shared
+    @State private var searchText = ""
+    @State private var selectedCategory: LocalCopingStrategyCategory?
+    @State private var showingFilterOptions = false
+    @State private var selectedTimeFilter: TimeFilterOption?
+    @State private var strategies: [LocalCopingStrategyDetail] = []
+    
+    var onStrategySelected: (LocalCopingStrategyDetail) -> Void
+    
+    // Initialize with an optional initial category filter
+    init(initialCategory: LocalCopingStrategyCategory? = nil, onStrategySelected: @escaping (LocalCopingStrategyDetail) -> Void) {
+        self.onStrategySelected = onStrategySelected
+        self._selectedCategory = State(initialValue: initialCategory)
+    }
+    
+    enum TimeFilterOption: String, CaseIterable, Identifiable {
+        case quick = "Quick Relief (< 5 min)"
+        case moderate = "Moderate (5-15 min)" 
+        case intensive = "In-Depth (> 15 min)"
+        
+        var id: String { self.rawValue }
+        
+        var color: Color {
+            switch self {
+            case .quick: return .green
+            case .moderate: return .blue
+            case .intensive: return .purple
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .quick: return "Strategies that take 5 minutes or less"
+            case .moderate: return "Strategies that take 5-15 minutes"
+            case .intensive: return "Strategies that take more than 15 minutes"
+            }
+        }
+        
+        var iconName: String {
+            switch self {
+            case .quick: return "bolt"
+            case .moderate: return "clock"
+            case .intensive: return "hourglass"
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                AppColors.background
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Search bar
+                    searchBarView
+                    
+                    // Filter options
+                    filterOptionsView
+                    
+                    // Strategy list
+                    if filteredStrategies.isEmpty {
+                        emptyResultsView
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(filteredStrategies) { strategy in
+                                    strategyRow(strategy)
+                                        .onTapGesture {
+                                            onStrategySelected(strategy)
+                                        }
+                                }
+                            }
+                            .padding()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Coping Strategies")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                strategies = strategiesLibrary.strategies
+            }
+        }
+    }
+    
+    private var searchBarView: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(AppColors.textLight)
+            
+            TextField("Search strategies...", text: $searchText)
+                .font(AppTextStyles.body2)
+            
+            if !searchText.isEmpty {
+                Button(action: {
+                    searchText = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.textLight)
+                }
+            }
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .cornerRadius(AppLayout.cornerRadius)
+        .padding()
+    }
+    
+    private var filterOptionsView: some View {
+        VStack(spacing: 12) {
+            // Categories
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    categoryFilterButton(nil, "All")
+                    
+                    ForEach(LocalCopingStrategyCategory.allCases) { category in
+                        categoryFilterButton(category, category.displayName)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Time filters
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    timeFilterButton(nil, "Any Duration")
+                    
+                    ForEach(TimeFilterOption.allCases) { option in
+                        timeFilterButton(option, option.rawValue)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.bottom)
+    }
+    
+    private func categoryFilterButton(_ category: LocalCopingStrategyCategory?, _ title: String) -> some View {
+        Button(action: {
+            withAnimation {
+                selectedCategory = category
+            }
+        }) {
+            HStack {
+                if let category = category {
+                    Image(systemName: category.iconName)
+                        .font(.system(size: 12))
+                } else {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 12))
+                }
+                
+                Text(title)
+                    .font(AppTextStyles.body3)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(selectedCategory == category ? AppColors.primary.opacity(0.2) : AppColors.cardBackground)
+                    .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
+            )
+            .foregroundColor(selectedCategory == category ? AppColors.primary : AppColors.textMedium)
+        }
+    }
+    
+    private func timeFilterButton(_ option: TimeFilterOption?, _ title: String) -> some View {
+        Button(action: {
+            withAnimation {
+                selectedTimeFilter = option
+            }
+        }) {
+            HStack {
+                if let option = option {
+                    Image(systemName: option.iconName)
+                        .font(.system(size: 12))
+                } else {
+                    Image(systemName: "clock")
+                        .font(.system(size: 12))
+                }
+                
+                Text(title)
+                    .font(AppTextStyles.body3)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(selectedTimeFilter == option ? AppColors.primary.opacity(0.2) : AppColors.cardBackground)
+                    .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
+            )
+            .foregroundColor(selectedTimeFilter == option ? AppColors.primary : AppColors.textMedium)
+        }
+    }
+    
+    private func strategyRow(_ strategy: LocalCopingStrategyDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                // Category icon
+                ZStack {
+                    Circle()
+                        .fill(strategy.category.color.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: strategy.category.iconName)
+                        .font(.system(size: 18))
+                        .foregroundColor(strategy.category.color)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(strategy.title)
+                        .font(AppTextStyles.h4)
+                        .foregroundColor(AppColors.textDark)
+                    
+                    Text(strategy.category.displayName)
+                        .font(AppTextStyles.body3)
+                        .foregroundColor(AppColors.textMedium)
+                }
+                
+                Spacer()
+                
+                // Time indicator
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 12))
+                    Text(strategy.timeToComplete)
+                        .font(AppTextStyles.body3)
+                }
+                .foregroundColor(AppColors.textMedium)
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppColors.textLight)
+            }
+            
+            Text(strategy.description)
+                .font(AppTextStyles.body2)
+                .foregroundColor(AppColors.textMedium)
+                .lineLimit(2)
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .cornerRadius(AppLayout.cornerRadius)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
+    }
+    
+    private var emptyResultsView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 50))
+                .foregroundColor(AppColors.textLight)
+            
+            Text("No matching strategies found")
+                .font(AppTextStyles.h3)
+                .foregroundColor(AppColors.textMedium)
+            
+            Text("Try adjusting your filters or search term")
+                .font(AppTextStyles.body2)
+                .foregroundColor(AppColors.textLight)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button(action: {
+                searchText = ""
+                selectedCategory = nil
+                selectedTimeFilter = nil
+            }) {
+                Text("Clear All Filters")
+                    .font(AppTextStyles.body1)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(AppColors.primary)
+                    .cornerRadius(AppLayout.cornerRadius)
+            }
+            .padding(.top, 10)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    // MARK: - Filtering Logic
+    
+    private var filteredStrategies: [LocalCopingStrategyDetail] {
+        var result = strategies
+        
+        // Apply category filter
+        if let category = selectedCategory {
+            result = result.filter { $0.category == category }
+        }
+        
+        // Apply time filter
+        if let timeFilter = selectedTimeFilter {
+            result = result.filter { strategy in
+                let timeString = strategy.timeToComplete.lowercased()
+                let extractedMinutes = extractMinutes(from: timeString)
+                
+                switch timeFilter {
+                case .quick:
+                    return extractedMinutes <= 5
+                case .moderate:
+                    return extractedMinutes > 5 && extractedMinutes <= 15
+                case .intensive:
+                    return extractedMinutes > 15
+                }
+            }
+        }
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            result = result.filter { strategy in
+                strategy.title.lowercased().contains(searchText.lowercased()) ||
+                strategy.description.lowercased().contains(searchText.lowercased()) ||
+                strategy.category.displayName.lowercased().contains(searchText.lowercased()) ||
+                strategy.steps.joined().lowercased().contains(searchText.lowercased())
+            }
+        }
+        
+        return result
+    }
+    
+    private func extractMinutes(from timeString: String) -> Int {
+        // Extract numeric values from strings like "5 minutes", "10-15 minutes"
+        // For ranges, take the average
+        if timeString.contains("-") {
+            let components = timeString.components(separatedBy: "-")
+            if components.count >= 2 {
+                let firstPart = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let secondPart = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if let min = Int(firstPart.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()),
+                   let max = Int(secondPart.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) {
+                    return (min + max) / 2
+                }
+            }
+        }
+        
+        // Extract single values
+        let numbers = timeString.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                                .joined()
+        if let minutes = Int(numbers) {
+            return minutes
+        }
+        
+        // Default values based on common descriptions
+        if timeString.contains("quick") || timeString.contains("brief") {
+            return 5
+        } else if timeString.contains("moderate") {
+            return 10
+        } else if timeString.contains("long") || timeString.contains("extended") {
+            return 20
+        }
+        
+        return 10 // Default assumption
+    }
+}
+
+// Define ResillienceActivity if it doesn't exist
+struct ResillienceActivity: Identifiable {
+    let id = UUID()
+    let title: String
+    let description: String
+    let iconName: String
 }
 

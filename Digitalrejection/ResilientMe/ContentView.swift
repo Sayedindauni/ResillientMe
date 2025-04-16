@@ -9,8 +9,7 @@ import SwiftUI
 import CoreData
 import ResilientMe
 
-// Import all necessary views - REMOVED DASHBOARDVIEW as it's defined locally now
-// import struct ResilientMe.DashboardView
+// Import all necessary views
 import struct ResilientMe.JournalView
 import struct ResilientMe.MoodView
 import struct ResilientMe.CommunityView
@@ -18,8 +17,6 @@ import struct ResilientMe.ProfileView
 import struct ResilientMe.InsightsView
 import class ResilientMe.MoodAnalysisEngine
 import class ResilientMe.CoreDataMoodStore
-
-
 
 // Add typealias to maintain compatibility with existing code
 typealias AppCopy = LocalAppCopy
@@ -84,38 +81,7 @@ struct ContentView: View {
                     Text("Insights")
                 }
                 .tag(5)
-            
-            EnhancedCopingStrategiesLibraryView()
-                .tabItem {
-                    Image(systemName: "brain.head.profile")
-                    Text("Strategies")
-                }
-                .tag(6)
         }
-        .onAppear {
-            setupNotificationObservers()
-        }
-        .onDisappear {
-            removeNotificationObservers()
-        }
-    }
-    
-    private func setupNotificationObservers() {
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("SwitchToStrategiesTab"),
-            object: nil,
-            queue: .main
-        ) { _ in
-            selectedTab = 6 // Switch to the Strategies tab
-        }
-    }
-    
-    private func removeNotificationObservers() {
-        NotificationCenter.default.removeObserver(
-            self,
-            name: NSNotification.Name("SwitchToStrategiesTab"),
-            object: nil
-        )
     }
     
     private func refreshAffirmation() {
