@@ -1,16 +1,9 @@
 import Foundation
 import SwiftUI
-// Making the module import explicit to avoid ambiguity
 import ResilientMe
 
-// Define a single place for important typealiases 
-// This should be the only place where these types are explicitly defined
-// Other files should import this file and use these types
-// We're using StrategyCategory from EngineModels in ResilientMe
+// Single source of truth for coping strategy type definitions
 public typealias EngineCopingStrategyCategory = ResilientMe.EngineModels.StrategyCategory
-
-// Define a public typealias for EngineStrategyCategory to be used throughout the app
-public typealias EngineStrategyCategory = EngineCopingStrategyCategory
 
 // MARK: - Core Coping Strategy Types
 // This file contains the primary definitions for coping strategy types
@@ -120,12 +113,5 @@ public struct CoreStrategyDetail: Identifiable, Codable, Hashable {
     }
 }
 
-// MARK: - Backward Compatibility Typealiases - Use explicit module qualifier 
-// Define these as explicit typealiases to avoid ambiguity with other modules' types
-public typealias CopingStrategyCategory = ResilientMe.CoreCopingCategory
-public typealias StrategyDuration = ResilientMe.CoreStrategyDuration
-public typealias CopingStrategyDetail = ResilientMe.CoreStrategyDetail
-
-// These typealiases are causing redeclaration errors - removing them
-// public typealias LocalCopingStrategyCategory = ResilientMe.EngineCopingStrategyCategory
-// public typealias EngineStrategyCategory = ResilientMe.EngineCopingStrategyCategory 
+// Remove these problematic typealiases that are causing ambiguity
+// We'll reference the types directly with explicit module names instead 

@@ -183,4 +183,23 @@ struct OutlineButtonStyle: ButtonStyle {
 
 // Add any additional styles below this line
 
+// Define a secondary button style
+struct SecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(ThemeTextStyles.buttonFont)
+            .foregroundColor(ThemeColors.primary)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(ThemeColors.background)
+            .cornerRadius(ThemeLayout.cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: ThemeLayout.cornerRadius)
+                    .stroke(ThemeColors.primary.opacity(0.3), lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
 // End of Theme.swift 

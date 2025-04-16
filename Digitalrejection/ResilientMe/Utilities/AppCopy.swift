@@ -17,8 +17,8 @@ public struct CopingStrategy {
     let description: String
 }
 
-// Definition for OnboardingMessage type
-public struct AppOnboardingMessage {
+// Rename to avoid conflict with AppTypes.swift
+public struct OnboardingMessage {
     let title: String
     let subtitle: String
     let message: String
@@ -155,22 +155,22 @@ public struct LocalAppCopy {
     // MARK: - Onboarding Messages
     
     static let onboardingMessages = [
-        AppOnboardingMessage(
+        OnboardingMessage(
             title: "It's OK to Feel",
             subtitle: "Rejection is universal",
             message: "Everyone experiences rejection, especially in the digital age. Your feelings are valid and shared by many."
         ),
-        AppOnboardingMessage(
+        OnboardingMessage(
             title: "Build Resilience",
             subtitle: "Turn pain into growth",
             message: "Each rejection is an opportunity to develop emotional strength that will serve you throughout life."
         ),
-        AppOnboardingMessage(
+        OnboardingMessage(
             title: "Process & Release",
             subtitle: "Track, reflect, move forward",
             message: "ResilientMe helps you safely process difficult emotions and transform rejection into deeper self-understanding."
         ),
-        AppOnboardingMessage(
+        OnboardingMessage(
             title: "You're Not Alone",
             subtitle: "Connect with others",
             message: "Share experiences and insights with a community that understands what you're going through."

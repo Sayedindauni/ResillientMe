@@ -2,6 +2,102 @@ import SwiftUI
 import ResilientMe
 import UIKit
 
+// Define the missing enums
+enum CopingBreathingPhase: String, Identifiable, CaseIterable {
+    case inhale
+    case hold
+    case exhale
+    case holdAfterExhale
+    case complete
+    
+    var id: String { rawValue }
+    
+    var instruction: String {
+        switch self {
+        case .inhale: return "Breathe In"
+        case .hold: return "Hold"
+        case .exhale: return "Breathe Out"
+        case .holdAfterExhale: return "Hold"
+        case .complete: return "Complete"
+        }
+    }
+    
+    // Change to a computed property with private backing storage
+    private static var _timeRemaining: [CopingBreathingPhase: Double] = [:]
+    
+    var timeRemaining: Double {
+        get { CopingBreathingPhase._timeRemaining[self] ?? 0.0 }
+        set { CopingBreathingPhase._timeRemaining[self] = newValue }
+    }
+}
+
+enum CopingBreathingPattern: String, CaseIterable, Identifiable {
+    case fourSevenEight = "4-7-8 Breathing"
+    case boxBreathing = "Box Breathing"
+    case deepBreathing = "Deep Breathing"
+    case calmingBreath = "Calming Breath"
+    
+    var id: String { rawValue }
+    
+    var description: String {
+        switch self {
+        case .fourSevenEight:
+            return "Inhale for 4 seconds, hold for 7 seconds, exhale for 8 seconds"
+        case .boxBreathing:
+            return "Inhale for 4 seconds, hold for 4 seconds, exhale for 4 seconds, hold for 4 seconds"
+        case .deepBreathing:
+            return "Inhale deeply for 5 seconds, exhale slowly for 5 seconds"
+        case .calmingBreath:
+            return "Inhale for 3 seconds, hold for 2 seconds, exhale for 4 seconds"
+        }
+    }
+    
+    var inhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 4.0
+        case .boxBreathing: return 4.0
+        case .deepBreathing: return 5.0
+        case .calmingBreath: return 3.0
+        }
+    }
+    
+    var holdTime: Double {
+        switch self {
+        case .fourSevenEight: return 7.0
+        case .boxBreathing: return 4.0
+        case .deepBreathing: return 0.0
+        case .calmingBreath: return 2.0
+        }
+    }
+    
+    var exhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 8.0
+        case .boxBreathing: return 4.0
+        case .deepBreathing: return 5.0
+        case .calmingBreath: return 4.0
+        }
+    }
+    
+    var holdAfterExhaleTime: Double {
+        switch self {
+        case .fourSevenEight: return 0.0
+        case .boxBreathing: return 4.0
+        case .deepBreathing: return 0.0
+        case .calmingBreath: return 0.0
+        }
+    }
+    
+    var totalCycleTime: Double {
+        return inhaleTime + holdTime + exhaleTime + holdAfterExhaleTime
+    }
+}
+
+// These enums are now defined in the Dashboard file
+// For simplicity, define the same type aliases here
+typealias BreathingPhase = CopingBreathingPhase
+typealias BreathingPattern = CopingBreathingPattern
+
 // MARK: - Haptic Feedback
 struct LocalHapticFeedback {
     static func light() {
@@ -2210,8 +2306,9 @@ struct EnhancedStrategyDetailView: View {
                             // Breathing pattern selection
                             Picker("Pattern", selection: $breathingPattern) {
                                 Text("4-7-8").tag(BreathingPattern.fourSevenEight)
-                                Text("Box (4-4-4-4)").tag(BreathingPattern.box)
-                                Text("Deep (5-2-5)").tag(BreathingPattern.deep)
+                                Text("Box (4-4-4-4)").tag(BreathingPattern.boxBreathing)
+                                Text("Deep (5-2-5)").tag(BreathingPattern.deepBreathing)
+                                Text("Calming Breath").tag(BreathingPattern.calmingBreath)
                             }
                             .pickerStyle(SegmentedPickerStyle())
                             .onChange(of: breathingPattern) { _ in
@@ -2222,11 +2319,11 @@ struct EnhancedStrategyDetailView: View {
                     
                     // Pattern description
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(breathingPattern.title)
+                        Text(breathingPattern.description)
                             .font(AppTextStyles.body2)
                             .foregroundColor(AppColors.textDark)
                         
-                        Text(breathingPattern.description)
+                        Text("Inhale for \(Int(breathingPattern.inhaleTime)) seconds, hold for \(Int(breathingPattern.holdTime)) seconds, exhale for \(Int(breathingPattern.exhaleTime)) seconds")
                             .font(AppTextStyles.body3)
                             .foregroundColor(AppColors.textMedium)
                     }
@@ -2272,7 +2369,7 @@ struct EnhancedStrategyDetailView: View {
                             .fill(strategy.category.color.opacity(breathingOpacity))
                             .frame(width: 220, height: 220)
                             .scaleEffect(breathingScale)
-                            .animation(.easeInOut(duration: breathingPhase.duration), value: breathingScale)
+                            .animation(.easeInOut(duration: 1.0), value: breathingScale)
                         
                         // Instruction text
                         VStack(spacing: 8) {
@@ -2293,7 +2390,7 @@ struct EnhancedStrategyDetailView: View {
                     // Progress indicators
                     VStack(spacing: 16) {
                         // Breath counter
-                        Text("Breath \(breathingCycleCount)/7")
+                        Text("Breath \(breathingCycleCount)/\(Int(breathingPattern.totalCycleTime))")
                             .font(AppTextStyles.body2)
                             .foregroundColor(AppColors.textMedium)
                         
@@ -2389,7 +2486,7 @@ struct EnhancedStrategyDetailView: View {
     // Helper function to create phase indicator for breathing visualization
     private func phaseIndicator(phase: BreathingPhase, width: CGFloat) -> some View {
         Rectangle()
-            .fill(breathingPhase == phase ? Color.white : Color.white.opacity(0.3))
+            .fill(breathingPhase == .inhale ? Color.green : breathingPhase == .hold ? Color.yellow : breathingPhase == .exhale ? Color.blue : breathingPhase == .holdAfterExhale ? Color.orange : Color.red)
             .frame(width: max(width * 200, 20))
     }
     
@@ -2446,7 +2543,7 @@ struct EnhancedStrategyDetailView: View {
             if breathingPattern.holdAfterExhaleTime > 0 {
                 scheduleNextPhase(after: breathingPattern.exhaleTime, nextPhase: .holdAfterExhale)
             } else {
-                scheduleNextPhase(after: breathingPattern.exhaleTime, nextPhase: breathingCycleCount < 7 ? .inhale : .complete)
+                scheduleNextPhase(after: breathingPattern.exhaleTime, nextPhase: breathingCycleCount < Int(breathingPattern.totalCycleTime) ? .inhale : .complete)
             }
             
         case .holdAfterExhale:
@@ -2456,7 +2553,7 @@ struct EnhancedStrategyDetailView: View {
             }
             
             // Schedule next phase
-            scheduleNextPhase(after: breathingPattern.holdAfterExhaleTime, nextPhase: breathingCycleCount < 7 ? .inhale : .complete)
+            scheduleNextPhase(after: breathingPattern.holdAfterExhaleTime, nextPhase: breathingCycleCount < Int(breathingPattern.totalCycleTime) ? .inhale : .complete)
             
         case .complete:
             // Exercise complete
@@ -2477,7 +2574,7 @@ struct EnhancedStrategyDetailView: View {
     private func scheduleNextPhase(after seconds: Double, nextPhase: BreathingPhase) {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
             if showingBreathingExercise {
-                if nextPhase == .inhale && breathingCycleCount < 7 {
+                if nextPhase == .inhale && breathingCycleCount < Int(breathingPattern.totalCycleTime) {
                     breathingCycleCount += 1
                 }
                 
@@ -2641,116 +2738,4 @@ struct EnhancedCopingStrategiesLibraryView_Previews: PreviewProvider {
     }
 }
 
-// MARK: - Breathing Pattern Model
-enum BreathingPattern: Int, CaseIterable {
-    case fourSevenEight
-    case box
-    case deep
-    
-    var title: String {
-        switch self {
-        case .fourSevenEight:
-            return "4-7-8 Breathing"
-        case .box:
-            return "Box Breathing"
-        case .deep:
-            return "Deep Breathing"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .fourSevenEight:
-            return "Inhale for 4 seconds, hold for 7 seconds, exhale for 8 seconds. This pattern has calming effects on the nervous system."
-        case .box:
-            return "Inhale for 4 seconds, hold for 4 seconds, exhale for 4 seconds, hold for 4 seconds. This creates a balanced, stabilizing breath."
-        case .deep:
-            return "Inhale deeply for 5 seconds, hold briefly for 2 seconds, exhale fully for 5 seconds. Focus on filling and emptying the lungs completely."
-        }
-    }
-    
-    var inhaleTime: Double {
-        switch self {
-        case .fourSevenEight: return 4.0
-        case .box: return 4.0
-        case .deep: return 5.0
-        }
-    }
-    
-    var holdTime: Double {
-        switch self {
-        case .fourSevenEight: return 7.0
-        case .box: return 4.0
-        case .deep: return 2.0
-        }
-    }
-    
-    var exhaleTime: Double {
-        switch self {
-        case .fourSevenEight: return 8.0
-        case .box: return 4.0
-        case .deep: return 5.0
-        }
-    }
-    
-    var holdAfterExhaleTime: Double {
-        switch self {
-        case .fourSevenEight: return 0.0
-        case .box: return 4.0
-        case .deep: return 0.0
-        }
-    }
-    
-    var totalCycleTime: Double {
-        return inhaleTime + holdTime + exhaleTime + holdAfterExhaleTime
-    }
-}
 
-// MARK: - Breathing Phase Model
-enum BreathingPhase: Equatable {
-    case inhale
-    case hold
-    case exhale
-    case holdAfterExhale
-    case complete
-    
-    var instruction: String {
-        switch self {
-        case .inhale: return "Inhale"
-        case .hold: return "Hold"
-        case .exhale: return "Exhale"
-        case .holdAfterExhale: return "Hold"
-        case .complete: return "Complete"
-        }
-    }
-    
-    var duration: Double {
-        switch self {
-        case .inhale: return 4.0
-        case .hold: return 7.0
-        case .exhale: return 8.0
-        case .holdAfterExhale: return 4.0
-        case .complete: return 1.0
-        }
-    }
-    
-    var timeRemaining: Double {
-        switch self {
-        case .inhale: return 4.0
-        case .hold: return 7.0
-        case .exhale: return 8.0
-        case .holdAfterExhale: return 4.0
-        case .complete: return 0.0
-        }
-    }
-    
-    var id: String {
-        switch self {
-        case .inhale: return "inhale"
-        case .hold: return "hold"
-        case .exhale: return "exhale"
-        case .holdAfterExhale: return "holdAfterExhale"
-        case .complete: return "complete"
-        }
-    }
-} 

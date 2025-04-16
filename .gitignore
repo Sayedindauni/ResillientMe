@@ -1,8 +1,44 @@
 # Xcode
+##
+## User-specific files
 xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+## Build artifacts
 build/
 DerivedData/
 *.o
 *.bak
-.DS_Store
 *.tmp
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Swift
+##
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Temp files
+*.swp
+*~

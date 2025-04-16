@@ -1,24 +1,25 @@
 import SwiftUI
+import ResilientMe
 
 struct CoreCopingStrategyDetailView: View {
-    var strategy: CopingStrategyDetail
+    var strategy: LocalCopingStrategyDetail
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(strategy.name)
+                    Text(strategy.title)
                         .font(.title)
                         .fontWeight(.bold)
                     
                     HStack {
-                        CategoryBadge(category: strategy.category.displayName)
+                        CategoryBadge(category: strategy.category.rawValue)
                         Spacer()
                         
                         Label(
-                            title: { Text(strategy.duration.rawValue) },
-                            icon: { Image(systemName: strategy.duration.iconName) }
+                            title: { Text(strategy.timeToComplete) },
+                            icon: { Image(systemName: "clock") }
                         )
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -60,21 +61,24 @@ struct CoreCopingStrategyDetailView: View {
                     .padding(.bottom, 8)
                 }
                 
-                // Benefits
-                if !strategy.benefits.isEmpty {
+                // Tags
+                if !strategy.tags.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Benefits")
+                        Text("Tags")
                             .font(.headline)
                         
-                        ForEach(strategy.benefits, id: \.self) { benefit in
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(strategy.category.color)
-                                
-                                Text(benefit)
-                                    .font(.body)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(strategy.tags, id: \.self) { tag in
+                                    Text(tag)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.secondary.opacity(0.2))
+                                        .foregroundColor(.primary)
+                                        .cornerRadius(8)
+                                }
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                     .padding(.bottom, 8)
@@ -118,12 +122,13 @@ struct CategoryBadge: View {
 struct CoreCopingStrategyDetailView_Previews: PreviewProvider {
     static var previews: some View {
         CoreCopingStrategyDetailView(
-            strategy: CopingStrategyDetail(
+            strategy: LocalCopingStrategyDetail(
                 id: UUID(),
-                name: "Deep Breathing",
+                title: "Deep Breathing",
                 description: "A simple technique to reduce stress and anxiety.",
-                category: .physical,
-                duration: .short,
+                category: .mindfulness,
+                timeToComplete: "5-10 minutes",
+                difficultyLevel: "Beginner",
                 steps: [
                     "Find a quiet place to sit or lie down",
                     "Breathe in slowly through your nose for a count of 4",
@@ -131,12 +136,8 @@ struct CoreCopingStrategyDetailView_Previews: PreviewProvider {
                     "Exhale slowly through your mouth for a count of 6",
                     "Repeat for 5-10 minutes"
                 ],
-                benefits: [
-                    "Reduces stress and anxiety",
-                    "Helps with focus and concentration",
-                    "Can be done anywhere"
-                ],
-                researchBacked: true
+                source: "ResilientMe",
+                tags: ["Breathing", "Stress Relief", "Quick"]
             )
         )
     }

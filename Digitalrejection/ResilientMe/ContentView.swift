@@ -9,8 +9,8 @@ import SwiftUI
 import CoreData
 import ResilientMe
 
-// Import all necessary views
-import struct ResilientMe.DashboardView
+// Import all necessary views - REMOVED DASHBOARDVIEW as it's defined locally now
+// import struct ResilientMe.DashboardView
 import struct ResilientMe.JournalView
 import struct ResilientMe.MoodView
 import struct ResilientMe.CommunityView
@@ -18,6 +18,8 @@ import struct ResilientMe.ProfileView
 import struct ResilientMe.InsightsView
 import class ResilientMe.MoodAnalysisEngine
 import class ResilientMe.CoreDataMoodStore
+
+
 
 // Add typealias to maintain compatibility with existing code
 typealias AppCopy = LocalAppCopy

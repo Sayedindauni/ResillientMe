@@ -1,5 +1,6 @@
 import SwiftUI
 import ResilientMe
+import UIKit
 
 /// A reusable card component for consistent styling across the app
 struct CardView<Content: View>: View {
@@ -80,7 +81,7 @@ struct InteractiveCardView<Content: View>: View {
     var body: some View {
         Button(action: {
             action()
-            HapticFeedback.light()
+            LocalHapticFeedback.light()
         }) {
             cardContent
         }

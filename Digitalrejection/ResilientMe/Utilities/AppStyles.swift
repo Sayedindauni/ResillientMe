@@ -28,7 +28,7 @@ struct AppStyle {
             .padding(.horizontal, 24)
             .background(isPrimary ? Color.blue : Color.white)
             .foregroundColor(isPrimary ? Color.white : Color.black)
-            .cornerRadius(AppLayout.smallCornerRadius)
+            .cornerRadius(AppLayout.cornerRadius)
             .shadow(color: isPrimary ? Color.blue.opacity(0.3) : Color.clear, 
                    radius: 4, x: 0, y: 2)
     }
@@ -36,7 +36,7 @@ struct AppStyle {
     // Apply text style
     static func heading1Style<T: View>(_ content: T) -> some View {
         content
-            .font(AppTextStyles.h1)
+            .font(AppTextStyles.h2)
             .foregroundColor(Color.black)
     }
     

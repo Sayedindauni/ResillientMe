@@ -1,5 +1,7 @@
 import SwiftUI
+// Import ResilientMe first to ensure its definitions take precedence
 import ResilientMe
+import UIKit
 
 /// A specialized card view for displaying activities on the dashboard
 struct ActivityCardView: View {
@@ -14,7 +16,7 @@ struct ActivityCardView: View {
         title: String,
         description: String,
         iconName: String,
-        color: Color = AppColors.primary,
+        color: Color = ResilientMe.AppColors.primary,
         accessibilityHint: String? = nil,
         action: @escaping () -> Void
     ) {
@@ -29,7 +31,7 @@ struct ActivityCardView: View {
     var body: some View {
         Button(action: {
             action()
-            HapticFeedback.light()
+            ResilientMe.LocalHapticFeedback.light()
         }) {
             HStack(spacing: 16) {
                 // Icon container
@@ -47,12 +49,12 @@ struct ActivityCardView: View {
                 // Text content
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(AppTextStyles.h4)
-                        .foregroundColor(AppColors.textDark)
+                        .font(ResilientMe.AppTextStyles.h4)
+                        .foregroundColor(ResilientMe.AppColors.textDark)
                     
                     Text(description)
-                        .font(AppTextStyles.body3)
-                        .foregroundColor(AppColors.textMedium)
+                        .font(ResilientMe.AppTextStyles.body3)
+                        .foregroundColor(ResilientMe.AppColors.textMedium)
                         .lineLimit(2)
                 }
                 
@@ -61,15 +63,15 @@ struct ActivityCardView: View {
                 // Chevron indicator
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(AppColors.textLight)
+                    .foregroundColor(ResilientMe.AppColors.textLight)
                     .accessibility(hidden: true)
             }
             .padding()
-            .background(AppColors.cardBackground)
-            .cornerRadius(AppLayout.cornerRadius)
+            .background(ResilientMe.AppColors.cardBackground)
+            .cornerRadius(ResilientMe.AppLayout.cornerRadius)
             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
             .overlay(
-                RoundedRectangle(cornerRadius: AppLayout.cornerRadius)
+                RoundedRectangle(cornerRadius: ResilientMe.AppLayout.cornerRadius)
                     .stroke(Color.gray.opacity(0.1), lineWidth: 1)
             )
         }
@@ -91,7 +93,7 @@ struct QuickActionCardView: View {
     init(
         title: String,
         iconName: String,
-        color: Color = AppColors.primary,
+        color: Color = ResilientMe.AppColors.primary,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -103,7 +105,7 @@ struct QuickActionCardView: View {
     var body: some View {
         Button(action: {
             action()
-            HapticFeedback.light()
+            ResilientMe.LocalHapticFeedback.light()
         }) {
             VStack(spacing: 12) {
                 // Icon
@@ -120,15 +122,15 @@ struct QuickActionCardView: View {
                 
                 // Title
                 Text(title)
-                    .font(AppTextStyles.body2)
-                    .foregroundColor(AppColors.textDark)
+                    .font(ResilientMe.AppTextStyles.body2)
+                    .foregroundColor(ResilientMe.AppColors.textDark)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(minWidth: 100)
             .padding()
-            .background(AppColors.cardBackground)
-            .cornerRadius(AppLayout.cornerRadius)
+            .background(ResilientMe.AppColors.cardBackground)
+            .cornerRadius(ResilientMe.AppLayout.cornerRadius)
             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         }
         .buttonStyle(PressableButtonStyle())
@@ -146,18 +148,18 @@ struct ActivityCardView_Previews: PreviewProvider {
                 title: "Daily Check-in",
                 description: "Take a moment to reflect on your day",
                 iconName: "calendar.badge.clock",
-                color: AppColors.primary,
+                color: ResilientMe.AppColors.primary,
                 action: { print("Activity tapped") }
             )
             
             QuickActionCardView(
                 title: "Track Mood",
                 iconName: "chart.bar.fill",
-                color: AppColors.primary,
+                color: ResilientMe.AppColors.primary,
                 action: { print("Quick action tapped") }
             )
         }
         .padding()
-        .background(AppColors.background)
+        .background(ResilientMe.AppColors.background)
     }
 } 
