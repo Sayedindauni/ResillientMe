@@ -1,6 +1,140 @@
 import Foundation
 import CoreData
 import SwiftUI
+import ResilientMe
+
+// MARK: - Define missing protocols and classes 
+
+// MoodStoreProtocol definition - renamed to LocalMoodStoreProtocol to avoid ambiguity with ResilientMe.MoodStoreProtocol
+public protocol LocalMoodStoreProtocol {
+    // Empty protocol to represent the data store
+    // This is a stub to satisfy compiler requirements
+}
+
+// Renamed to avoid conflict with ResilientMe.StrategyEffectivenessStore and other implementations
+public class MoodStoreStrategyEffectiveness: ObservableObject {
+    public static let shared = MoodStoreStrategyEffectiveness()
+    
+    @Published public var ratingData: [StrategyRating] = []
+    
+    public struct StrategyRating: Identifiable, Codable {
+        public let id: UUID
+        public let strategy: String
+        public let rating: Int
+        public let timestamp: Date
+        public let moodBefore: String?
+        public let moodAfter: String?
+        public let moodImpact: String?
+        public let notes: String?
+        public let completionTime: TimeInterval?
+        
+        public init(
+            id: UUID = UUID(),
+            strategy: String,
+            rating: Int,
+            timestamp: Date = Date(),
+            moodBefore: String? = nil,
+            moodAfter: String? = nil,
+            moodImpact: String? = nil,
+            notes: String? = nil,
+            completionTime: TimeInterval? = nil
+        ) {
+            self.id = id
+            self.strategy = strategy
+            self.rating = rating
+            self.timestamp = timestamp
+            self.moodBefore = moodBefore
+            self.moodAfter = moodAfter
+            self.moodImpact = moodImpact
+            self.notes = notes
+            self.completionTime = completionTime
+        }
+    }
+    
+    private init() {
+        // Private initializer for singleton
+    }
+    
+    // Add rating for a strategy
+    public func addRating(
+        for strategy: String,
+        rating: Int,
+        moodBefore: String? = nil,
+        moodAfter: String? = nil,
+        moodImpact: String? = nil,
+        notes: String? = nil,
+        completionTime: TimeInterval? = nil
+    ) {
+        let newRating = StrategyRating(
+            strategy: strategy,
+            rating: rating,
+            moodBefore: moodBefore,
+            moodAfter: moodAfter,
+            moodImpact: moodImpact,
+            notes: notes,
+            completionTime: completionTime
+        )
+        
+        ratingData.append(newRating)
+    }
+    
+    // Get average rating for a strategy - primary implementation
+    public func getAverageRating(for strategy: String) -> Double {
+        let ratings = ratingData.filter { $0.strategy == strategy }.map { $0.rating }
+        guard !ratings.isEmpty else { return 0 }
+        return Double(ratings.reduce(0, +)) / Double(ratings.count)
+    }
+    
+    // Get completion count for a strategy - primary implementation
+    public func getCompletionCount(for strategy: String) -> Int {
+        return ratingData.filter { $0.strategy == strategy }.count
+    }
+    
+    // Get rating history for a strategy - primary implementation
+    public func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
+        return ratingData
+            .filter { $0.strategy == strategy }
+            .sorted { $0.timestamp < $1.timestamp }
+            .map { (date: $0.timestamp, rating: $0.rating) }
+    }
+    
+    // Get most effective strategies - primary implementation
+    public func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
+        var strategyRatings: [String: [Int]] = [:]
+        
+        // Group ratings by strategy
+        for rating in ratingData {
+            if strategyRatings[rating.strategy] == nil {
+                strategyRatings[rating.strategy] = []
+            }
+            strategyRatings[rating.strategy]?.append(rating.rating)
+        }
+        
+        // Calculate average rating for each strategy
+        let averages = strategyRatings.map { (strategy, ratings) in
+            (strategy: strategy, rating: Double(ratings.reduce(0, +)) / Double(ratings.count))
+        }
+        
+        // Sort by rating and return top 5
+        return averages.sorted { $0.rating > $1.rating }.prefix(5).map { $0 }
+    }
+    
+    // Get most used strategies - primary implementation
+    public func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
+        var strategyCounts: [String: Int] = [:]
+        
+        // Count usage of each strategy
+        for rating in ratingData {
+            strategyCounts[rating.strategy, default: 0] += 1
+        }
+        
+        // Convert to array and sort by count
+        return strategyCounts.map { (strategy: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+            .prefix(5)
+            .map { $0 }
+    }
+}
 
 // MARK: - ChartData for visualization
 struct ChartData: Identifiable {
@@ -257,8 +391,8 @@ class StrategyEffectivenessStoreHelper {
     }
 }
 
-// Extend the shared StrategyEffectivenessStore with additional functionality
-extension StrategyEffectivenessStore {
+// Extend the shared MoodStoreStrategyEffectiveness with additional functionality
+extension MoodStoreStrategyEffectiveness {
     private var helper: StrategyEffectivenessStoreHelper { StrategyEffectivenessStoreHelper.shared }
     private var userDefaults: UserDefaults { UserDefaults.standard }
     
@@ -403,7 +537,7 @@ extension StrategyEffectivenessStore {
 
 // MARK: - MoodStore for CoreData interactions
 // Rename to avoid redeclaration or use an extension instead
-class CoreDataMoodStore: ObservableObject, MoodStoreProtocol {
+class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
     @Published var moodEntries: [MoodData] = []
     @Published var recentMoods: [String] = []
     private let context: NSManagedObjectContext
@@ -703,32 +837,32 @@ class CoreDataMoodStore: ObservableObject, MoodStoreProtocol {
 
 // MARK: - CoreDataMoodStore Extension for StrategyEffectivenessStore integration
 
-// Extension to CoreDataMoodStore that integrates with StrategyEffectivenessStore
+// Extension to CoreDataMoodStore that integrates with MoodStoreStrategyEffectiveness
 extension CoreDataMoodStore {
-    // Access the shared StrategyEffectivenessStore
-    var strategyStore: StrategyEffectivenessStore { StrategyEffectivenessStore.shared }
+    // Access the shared MoodStoreStrategyEffectiveness
+    var strategyStore: MoodStoreStrategyEffectiveness { MoodStoreStrategyEffectiveness.shared }
     
-    // Delegate to StrategyEffectivenessStore's getCompletionCount
+    // Delegate to MoodStoreStrategyEffectiveness's getCompletionCount
     func getCompletionCount(for strategy: String) -> Int {
         return strategyStore.getCompletionCount(for: strategy)
     }
     
-    // Delegate to StrategyEffectivenessStore's getAverageRating
+    // Delegate to MoodStoreStrategyEffectiveness's getAverageRating
     func getAverageRating(for strategy: String) -> Double {
         return strategyStore.getAverageRating(for: strategy)
     }
     
-    // Delegate to StrategyEffectivenessStore's getMostEffectiveStrategies
+    // Delegate to MoodStoreStrategyEffectiveness's getMostEffectiveStrategies
     func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
         return strategyStore.getMostEffectiveStrategies()
     }
     
-    // Delegate to StrategyEffectivenessStore's getMostUsedStrategies
+    // Delegate to MoodStoreStrategyEffectiveness's getMostUsedStrategies
     func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
         return strategyStore.getMostUsedStrategies()
     }
     
-    // Delegate to StrategyEffectivenessStore's getRatingHistory
+    // Delegate to MoodStoreStrategyEffectiveness's getRatingHistory
     func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
         return strategyStore.getRatingHistory(for: strategy)
     }

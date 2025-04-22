@@ -24,7 +24,8 @@ import ResilientMe
 // MARK: - Type Aliases to avoid ambiguity
 
 // These type aliases help resolve conflicts between types with same name
-typealias EngineMoodStoreProtocol = ResilientMe.MoodStoreProtocol
+// Use our locally defined protocol instead of the ResilientMe one to avoid ambiguity
+typealias EngineMoodStoreProtocol = LocalMoodStoreProtocol
 typealias EngineMoodRecommendationProtocol = ResilientMe.MoodRecommendationProtocol
 typealias EngineTimeInterval = TimeInterval
 

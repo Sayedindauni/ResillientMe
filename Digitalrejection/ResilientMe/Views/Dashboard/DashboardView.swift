@@ -903,8 +903,9 @@ struct DashboardView: View {
             // Use a more comprehensive strategies view
             DashboardStrategiesView(
                 initialCategory: selectedCategoryFilter,
-                onStrategySelected: { strategy in
-                    selectedStrategy = convertToAppStrategy(strategy)
+                onStrategySelected: { localStrategy in
+                    // Explicitly convert from LocalCopingStrategyDetail to AppCopingStrategyDetail
+                    selectedStrategy = convertToAppStrategy(localStrategy)
                     showingAllStrategies = false
                     showingStrategyDetail = true
                 }
@@ -1899,14 +1900,20 @@ struct DashboardView: View {
             return existingStrategy
         }
         
+        // Extract mood targets from tags if available
+        let moodTargets = localStrategy.tags.filter { tag in
+            ["anxious", "sad", "rejected", "frustrated", "stressed", "angry"].contains(tag.lowercased())
+        }
+        
         // Create a new AppCopingStrategyDetail based on the local strategy
-        // Note: This assumes that AppCopingStrategyDetail has a similar structure to LocalCopingStrategyDetail
         return AppCopingStrategyDetail(
+            id: localStrategy.id.uuidString,
             title: localStrategy.title,
             description: localStrategy.description,
             category: convertLocalToAppCategory(localStrategy.category),
             steps: localStrategy.steps,
-            timeToComplete: localStrategy.timeToComplete
+            timeToComplete: localStrategy.timeToComplete,
+            moodTargets: moodTargets.isEmpty ? ["rejected", "anxious", "sad"] : moodTargets
         )
     }
     

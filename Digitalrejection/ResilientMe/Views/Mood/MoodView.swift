@@ -187,8 +187,8 @@ struct MoodTrackerEntry: Identifiable, Hashable {
 
 struct MoodView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var moodStore: CoreDataMoodStore
-    @ObservedObject var moodAnalysisEngine: MoodAnalysisEngine
+    @StateObject private var moodStore: ResilientMe.CoreDataMoodStore
+    @ObservedObject var moodAnalysisEngine: ResilientMe.MoodAnalysisEngine
     
     // Add a computed property to safely access aiInitialized
     private var isAIInitialized: Bool {
@@ -210,7 +210,7 @@ struct MoodView: View {
     @State private var showingInsights: Bool = false
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingJournalPrompt: Bool = false
-    @State private var currentJournalPromptEntry: MoodData? = nil
+    @State private var currentJournalPromptEntry: ResilientMe.MoodData? = nil
     @State private var showingCopingStrategies: Bool = false
     @State private var selectedCopingStrategy: String?
     @State private var showingCharts: Bool = false
@@ -260,8 +260,8 @@ struct MoodView: View {
     
     // Initializer with MoodStore
     init(context: NSManagedObjectContext, initialMood: String = "", initialIntensity: Int = 3, 
-         moodAnalysisEngine: MoodAnalysisEngine) {
-        self._moodStore = StateObject(wrappedValue: CoreDataMoodStore(context: context))
+         moodAnalysisEngine: ResilientMe.MoodAnalysisEngine) {
+        self._moodStore = StateObject(wrappedValue: ResilientMe.CoreDataMoodStore(context: context))
         self.initialMood = initialMood
         self.initialIntensity = initialIntensity
         self.moodAnalysisEngine = moodAnalysisEngine
@@ -972,7 +972,7 @@ struct MoodView: View {
     }
     
     // Enhanced Journal prompt view for a specific entry
-    private func journalPromptView(entry: MoodData) -> some View {
+    private func journalPromptView(entry: ResilientMe.MoodData) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Reflective Prompt")
@@ -1479,7 +1479,7 @@ struct MoodView: View {
         previousMood = selectedMood
         previousIntensity = moodIntensity
         
-        let entry = MoodData(
+        let entry = ResilientMe.MoodData(
             id: UUID().uuidString,
             date: Date(),
             mood: selectedMood,
@@ -2050,10 +2050,10 @@ extension MoodView {
 struct MoodView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.preview.container.viewContext
-        let moodStore = CoreDataMoodStore(context: context)
+        let moodStore = ResilientMe.CoreDataMoodStore(context: context)
         
         // Create a MoodAnalysisEngine with the moodStore
-        let moodAnalysisEngine = MoodAnalysisEngine(moodStore: moodStore)
+        let moodAnalysisEngine = ResilientMe.MoodAnalysisEngine(moodStore: moodStore)
         
         return MoodView(context: context, moodAnalysisEngine: moodAnalysisEngine)
             .environment(\.managedObjectContext, context)

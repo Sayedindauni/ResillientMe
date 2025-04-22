@@ -1,6 +1,10 @@
 import SwiftUI
 import ResilientMe
 import UIKit
+import Foundation
+
+// Add typealias to use the central haptic feedback implementation
+typealias HapticFeedback = LocalHapticFeedback
 
 // Define the missing enums
 enum CopingBreathingPhase: String, Identifiable, CaseIterable {
@@ -97,44 +101,6 @@ enum CopingBreathingPattern: String, CaseIterable, Identifiable {
 // For simplicity, define the same type aliases here
 typealias BreathingPhase = CopingBreathingPhase
 typealias BreathingPattern = CopingBreathingPattern
-
-// MARK: - Haptic Feedback
-struct LocalHapticFeedback {
-    static func light() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-    
-    static func medium() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-    }
-    
-    static func heavy() {
-        let generator = UIImpactFeedbackGenerator(style: .heavy)
-        generator.impactOccurred()
-    }
-    
-    static func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
-    }
-    
-    static func success() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-    }
-    
-    static func warning() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
-    }
-    
-    static func error() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
-    }
-}
 
 // MARK: - Strategy Effectiveness Store
 class LocalStrategyEffectivenessStore: ObservableObject {
@@ -808,7 +774,7 @@ struct EnhancedStrategyDetailView: View {
                     
                     // Button to complete
                     Button(action: {
-                        LocalHapticFeedback.medium()
+                        HapticFeedback.medium()
                         completeStrategy()
                     }) {
                         Text("Complete & Rate")
@@ -841,7 +807,7 @@ struct EnhancedStrategyDetailView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         // Share the strategy
-                        LocalHapticFeedback.light()
+                        HapticFeedback.light()
                     }) {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundColor(AppColors.textDark)
@@ -979,7 +945,7 @@ struct EnhancedStrategyDetailView: View {
                     
                     // Start button
                     Button(action: {
-                        LocalHapticFeedback.medium()
+                        HapticFeedback.medium()
                         startGroundingExercise()
                     }) {
                         HStack {
@@ -1075,7 +1041,7 @@ struct EnhancedStrategyDetailView: View {
                             // Back button (if not first step)
                             if groundingStep > 0 {
                                 Button(action: {
-                                    LocalHapticFeedback.light()
+                                    HapticFeedback.light()
                                     withAnimation {
                                         groundingStep -= 1
                                     }
@@ -1095,7 +1061,7 @@ struct EnhancedStrategyDetailView: View {
                             
                             // Next button
                             Button(action: {
-                                LocalHapticFeedback.medium()
+                                HapticFeedback.medium()
                                 withAnimation {
                                     if groundingStep < groundingItems.count - 1 {
                                         groundingStep += 1
@@ -1131,7 +1097,7 @@ struct EnhancedStrategyDetailView: View {
                                 .multilineTextAlignment(.center)
                             
                             Button(action: {
-                                LocalHapticFeedback.medium()
+                                HapticFeedback.medium()
                                 completeStrategy()
                             }) {
                                 Text("Rate & Complete")
@@ -1144,7 +1110,7 @@ struct EnhancedStrategyDetailView: View {
                             }
                             
                             Button(action: {
-                                LocalHapticFeedback.light()
+                                HapticFeedback.light()
                                 resetGroundingExercise()
                             }) {
                                 Text("Start Over")
@@ -1175,7 +1141,7 @@ struct EnhancedStrategyDetailView: View {
         withAnimation {
             groundingStep = groundingItems.count
         }
-        LocalHapticFeedback.success()
+        HapticFeedback.success()
     }
     
     private func resetGroundingExercise() {
@@ -1270,7 +1236,7 @@ struct EnhancedStrategyDetailView: View {
                     
                     // Start button
                     Button(action: {
-                        LocalHapticFeedback.medium()
+                        HapticFeedback.medium()
                         startJournalingExercise()
                     }) {
                         HStack {
@@ -1301,7 +1267,7 @@ struct EnhancedStrategyDetailView: View {
                         Spacer()
                         
                         Button(action: {
-                            LocalHapticFeedback.light()
+                            HapticFeedback.light()
                             saveJournalEntry()
                         }) {
                             HStack(spacing: 4) {
@@ -1342,7 +1308,7 @@ struct EnhancedStrategyDetailView: View {
                         // Back button (if not first prompt)
                         if currentJournalPrompt > 0 {
                             Button(action: {
-                                LocalHapticFeedback.light()
+                                HapticFeedback.light()
                                 moveToJournalPrompt(currentJournalPrompt - 1)
                             }) {
                                 HStack {
@@ -1360,7 +1326,7 @@ struct EnhancedStrategyDetailView: View {
                         
                         // Next button
                         Button(action: {
-                            LocalHapticFeedback.medium()
+                            HapticFeedback.medium()
                             if currentJournalPrompt < journalPrompts.count - 1 {
                                 moveToJournalPrompt(currentJournalPrompt + 1)
                             } else {
@@ -1413,13 +1379,13 @@ struct EnhancedStrategyDetailView: View {
         // In a real app, this would save to a journal database
         // For now, just provide feedback
         if !journalText.isEmpty {
-            LocalHapticFeedback.success()
+            HapticFeedback.success()
         }
     }
     
     private func completeJournalingExercise() {
         saveJournalEntry()
-        LocalHapticFeedback.success()
+        HapticFeedback.success()
         completeStrategy()
     }
     
@@ -1442,7 +1408,7 @@ struct EnhancedStrategyDetailView: View {
                         HStack(spacing: 12) {
                             ForEach(["None", "Rain", "Ocean", "Forest", "White Noise"], id: \.self) { sound in
                                 Button(action: {
-                                    LocalHapticFeedback.light()
+                                    HapticFeedback.light()
                                     // Would play the selected sound
                                 }) {
                                     VStack(spacing: 8) {
@@ -1472,7 +1438,7 @@ struct EnhancedStrategyDetailView: View {
                     HStack {
                         ForEach(["None", "1 min", "3 min", "5 min"], id: \.self) { interval in
                             Button(action: {
-                                LocalHapticFeedback.light()
+                                HapticFeedback.light()
                                 // Would set the interval bell
                             }) {
                                 Text(interval)
@@ -1488,7 +1454,7 @@ struct EnhancedStrategyDetailView: View {
                 
                 // Start meditation button
                 Button(action: {
-                    LocalHapticFeedback.medium()
+                    HapticFeedback.medium()
                     startTimer()
                 }) {
                     HStack {
@@ -1653,7 +1619,7 @@ struct EnhancedStrategyDetailView: View {
                 Toggle("", isOn: $guidedModeActive)
                     .labelsHidden()
                     .onChange(of: guidedModeActive) { newValue in
-                        LocalHapticFeedback.selection()
+                        HapticFeedback.selection()
                         if newValue {
                             selectedStep = 0
                             resetTimer()
@@ -1751,7 +1717,7 @@ struct EnhancedStrategyDetailView: View {
         .background(selectedStep == index ? strategy.category.color.opacity(0.1) : Color.clear)
         .cornerRadius(8)
         .onTapGesture {
-            LocalHapticFeedback.light()
+            HapticFeedback.light()
             if !guidedModeActive {
                 withAnimation {
                     selectedStep = index
@@ -1802,7 +1768,7 @@ struct EnhancedStrategyDetailView: View {
                         // Timer controls
                         HStack(spacing: 24) {
                             Button(action: {
-                                LocalHapticFeedback.medium()
+                                HapticFeedback.medium()
                                 resetTimer()
                             }) {
                                 VStack {
@@ -1817,7 +1783,7 @@ struct EnhancedStrategyDetailView: View {
                             }
                             
                             Button(action: {
-                                LocalHapticFeedback.medium()
+                                HapticFeedback.medium()
                                 if isTimerRunning {
                                     stopTimer()
                                 } else {
@@ -1836,7 +1802,7 @@ struct EnhancedStrategyDetailView: View {
                             }
                             
                             Button(action: {
-                                LocalHapticFeedback.medium()
+                                HapticFeedback.medium()
                                 addOneMinute()
                             }) {
                                 VStack {
@@ -1939,7 +1905,7 @@ struct EnhancedStrategyDetailView: View {
                         .foregroundColor(star <= rating ? .yellow : AppColors.textLight)
                         .onTapGesture {
                             rating = star
-                            LocalHapticFeedback.selection()
+                            HapticFeedback.selection()
                         }
                 }
             }
@@ -1997,7 +1963,7 @@ struct EnhancedStrategyDetailView: View {
             
             // Save button
             Button(action: {
-                LocalHapticFeedback.success()
+                HapticFeedback.success()
                 saveRating()
                 showingCompletionSheet = false
             }) {
@@ -2044,7 +2010,7 @@ struct EnhancedStrategyDetailView: View {
     
     private func updateMoodAfter(_ change: Int) {
         moodChangeValue = change
-        LocalHapticFeedback.selection()
+        HapticFeedback.selection()
     }
     
     private func moodIntensityColor(intensity: Double) -> Color {
@@ -2140,7 +2106,7 @@ struct EnhancedStrategyDetailView: View {
     }
     
     private func advanceToNextStep() {
-        LocalHapticFeedback.medium()
+        HapticFeedback.medium()
         if selectedStep < strategy.steps.count - 1 {
             selectedStep += 1
             startStepTimer()
@@ -2153,11 +2119,11 @@ struct EnhancedStrategyDetailView: View {
             
             // Provide haptic feedback at certain milestones
             if secondsElapsed == estimatedSeconds / 2 {
-                LocalHapticFeedback.light()
+                HapticFeedback.light()
             } else if secondsElapsed == estimatedSeconds {
-                LocalHapticFeedback.success()
+                HapticFeedback.success()
             } else if secondsElapsed > estimatedSeconds && secondsElapsed % 60 == 0 {
-                LocalHapticFeedback.warning()
+                HapticFeedback.warning()
             }
         }
     }
@@ -2242,7 +2208,7 @@ struct EnhancedStrategyDetailView: View {
                 Slider(value: $moodIntensityBefore, in: 1...5, step: 1)
                     .accentColor(sliderColor)
                     .onChange(of: moodIntensityBefore) { _ in
-                        LocalHapticFeedback.selection()
+                        HapticFeedback.selection()
                     }
                 
                 HStack {
@@ -2261,7 +2227,7 @@ struct EnhancedStrategyDetailView: View {
             
             // Continue button
             Button(action: {
-                LocalHapticFeedback.medium()
+                HapticFeedback.medium()
                 showingMoodCheckIn = false
             }) {
                 Text("Start Strategy")
@@ -2312,7 +2278,7 @@ struct EnhancedStrategyDetailView: View {
                             }
                             .pickerStyle(SegmentedPickerStyle())
                             .onChange(of: breathingPattern) { _ in
-                                LocalHapticFeedback.selection()
+                                HapticFeedback.selection()
                             }
                         }
                     }
@@ -2334,7 +2300,7 @@ struct EnhancedStrategyDetailView: View {
                     
                     // Start button
                     Button(action: {
-                        LocalHapticFeedback.medium()
+                        HapticFeedback.medium()
                         startBreathingExercise()
                     }) {
                         HStack {
@@ -2432,7 +2398,7 @@ struct EnhancedStrategyDetailView: View {
                     HStack(spacing: 30) {
                         // Reset button
                         Button(action: {
-                            LocalHapticFeedback.medium()
+                            HapticFeedback.medium()
                             resetBreathingExercise()
                         }) {
                             VStack {
@@ -2448,7 +2414,7 @@ struct EnhancedStrategyDetailView: View {
                         
                         // Stop button
                         Button(action: {
-                            LocalHapticFeedback.medium()
+                            HapticFeedback.medium()
                             stopBreathingExercise()
                         }) {
                             VStack {
@@ -2515,7 +2481,7 @@ struct EnhancedStrategyDetailView: View {
             }
             
             // Provide light haptic feedback at beginning of inhale
-            LocalHapticFeedback.light()
+            HapticFeedback.light()
             
             // Schedule next phase
             scheduleNextPhase(after: breathingPattern.inhaleTime, nextPhase: breathingPattern.holdTime > 0 ? .hold : .exhale)
@@ -2537,7 +2503,7 @@ struct EnhancedStrategyDetailView: View {
             }
             
             // Provide medium haptic feedback at beginning of exhale
-            LocalHapticFeedback.light()
+            HapticFeedback.light()
             
             // Schedule next phase
             if breathingPattern.holdAfterExhaleTime > 0 {
@@ -2562,7 +2528,7 @@ struct EnhancedStrategyDetailView: View {
             }
             
             // Provide success haptic feedback
-            LocalHapticFeedback.success()
+            HapticFeedback.success()
             
             // End exercise after a brief pause
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

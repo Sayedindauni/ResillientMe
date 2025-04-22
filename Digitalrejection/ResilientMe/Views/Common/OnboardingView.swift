@@ -97,7 +97,7 @@ struct OnboardingScreenView: View {
                     if currentPage > 0 {
                         Button(action: {
                             currentPage -= 1
-                            ResilientMe.LocalHapticFeedback.light()
+                            LocalHapticFeedback.light()
                         }) {
                             HStack {
                                 Image(systemName: "chevron.left")
@@ -119,7 +119,7 @@ struct OnboardingScreenView: View {
                     Button(action: {
                         if currentPage < totalPages - 1 {
                             currentPage += 1
-                            ResilientMe.LocalHapticFeedback.light()
+                            LocalHapticFeedback.light()
                         } else {
                             self.completeOnboarding()
                         }
@@ -207,7 +207,7 @@ struct OnboardingScreenView: View {
             hasCompletedOnboarding = true
             isPresented = false
         }
-        ResilientMe.LocalHapticFeedback.success()
+        LocalHapticFeedback.success()
     }
 }
 

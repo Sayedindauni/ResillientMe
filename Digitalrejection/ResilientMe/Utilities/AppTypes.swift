@@ -210,6 +210,17 @@ public enum LocalCopingStrategyCategory: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
+    public var displayName: String {
+        switch self {
+        case .mindfulness: return "Mindfulness"
+        case .cognitive: return "Cognitive"
+        case .physical: return "Physical"
+        case .social: return "Social"
+        case .creative: return "Creative"
+        case .selfCare: return "Self-Care"
+        }
+    }
+    
     public var iconName: String {
         switch self {
         case .mindfulness: return "brain.head.profile"

@@ -3,25 +3,6 @@ import CoreData
 import ResilientMe
 import Charts
 
-// Utility extensions and shared components
-extension View {
-    func accessibilityCard(label: String, hint: String? = nil) -> some View {
-        return self
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(label)
-            .accessibilityHint(hint ?? "")
-    }
-    
-    func withMinTouchArea(size: CGFloat = 44) -> some View {
-        ZStack {
-            self
-            Color.clear
-                .frame(width: size, height: size)
-                .contentShape(Rectangle())
-        }
-    }
-}
-
 // MARK: - MoodJournalView
 
 struct MoodJournalView: View {
@@ -44,6 +25,7 @@ struct MoodJournalView: View {
     @State private var moodIntensity: Int = 3
     @State private var moodNote: String = ""
     @State private var isRejectionRelated: Bool = false
+    @State private var rejectionTrigger: String = ""
     @State private var showingHistory: Bool = false
     @State private var showingInsights: Bool = false
     
@@ -97,7 +79,7 @@ struct MoodJournalView: View {
             }
             .sheet(isPresented: $showAddNewEntry) {
                 if activeTab == .journal {
-                    JournalEntryEditorView(isNewEntry: true) { newEntry in
+                    JournalEntryEditorView(isNewEntry: true, initialPrompt: "") { newEntry in
                         if let newEntry = newEntry {
                             journalEntries.insert(newEntry, at: 0)
                         }
@@ -626,7 +608,8 @@ struct MoodJournalView: View {
             note: moodNote.isEmpty ? nil : moodNote
         )
         
-        moodStore.addMoodEntry(entry)
+        // Explicitly call the method on the object
+        moodStore.saveMoodEntry(entry: entry)
         
         // Reset the form
         resetMoodForm()
@@ -635,37 +618,47 @@ struct MoodJournalView: View {
     private func addMoodAndPromptForJournal() {
         guard let mood = selectedMood else { return }
         
-        // Save mood entry
+        // Save the basic mood entry first
         let entry = ResilientMe.MoodData(
             id: UUID().uuidString,
             date: Date(),
             mood: mood,
             intensity: moodIntensity,
-            note: moodNote.isEmpty ? nil : moodNote
+            note: moodNote.isEmpty ? nil : moodNote,
+            rejectionRelated: isRejectionRelated,
+            rejectionTrigger: isRejectionRelated ? rejectionTrigger : nil
         )
         
-        moodStore.addMoodEntry(entry)
+        // Explicitly call the method on the object
+        moodStore.saveMoodEntry(entry: entry)
         
-        // Set up journal prompt data
-        let promptData: [String: Any] = [
-            "mood": mood,
-            "moodIntensity": moodIntensity,
-            "title": "How I'm feeling: \(mood)",
-            "prompt": generateJournalPrompt(for: mood, intensity: moodIntensity, isRejectionRelated: isRejectionRelated),
-            "tags": isRejectionRelated ? ["Mood", "Rejection"] : ["Mood"]
-        ]
+        // Prepare for journal entry
+        // Use the saved MoodData to potentially generate a relevant prompt
+        let (title, prompt, tags) = moodStore.getJournalPromptFor(entry: entry)
         
-        // Set active tab to journal and show editor
-        activeTab = .journal
+        // Show the Journal Entry Editor
+        let newJournalEntry = JournalEntryModel(
+            id: UUID().uuidString, // Generate a new ID for the journal entry
+            date: Date(),
+            title: title,
+            content: "", // Start with empty content
+            tags: tags,
+            mood: JournalMood(rawValue: mood) ?? .neutral, // Map mood string
+            moodIntensity: moodIntensity
+        )
         
-        // Reset the mood form
+        // Use the correct initializer for JournalEntryEditorView
+        showAddNewEntry = false // Dismiss mood sheet first if needed
+        selectedEntry = newJournalEntry // Set state to trigger sheet
+        // Need to pass the prompt to the editor
+        // For now, pass the generated prompt directly
+        // showJournalEditor(entry: newJournalEntry, initialPrompt: prompt)
+        
+        // TODO: Refactor to show the journal editor modally, passing the prompt
+        print("Prompting user to add journal entry for mood: \(mood)")
+        
+        // Reset mood form after saving and preparing journal
         resetMoodForm()
-        
-        // Show journal entry editor with the mood data
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            // Create a journal entry with mood data
-            showAddNewEntry = true
-        }
     }
     
     private func resetMoodForm() {
@@ -673,6 +666,7 @@ struct MoodJournalView: View {
         moodIntensity = 3
         moodNote = ""
         isRejectionRelated = false
+        rejectionTrigger = ""
     }
     
     private func generateJournalPrompt(for mood: String, intensity: Int, isRejectionRelated: Bool) -> String {
@@ -799,19 +793,29 @@ struct MoodJournalView: View {
 // MARK: - Supporting Views
 
 // Rename to avoid conflicts with ResilientMe
-struct LocalFilterOption: Identifiable, CaseIterable {
-    let id: String
-    let title: String
+// Refactored from struct to enum for proper switch exhaustiveness
+enum LocalFilterOption: String, Identifiable, CaseIterable, Equatable {
+    case all = "All"
+    case rejections = "Rejections"
+    case insights = "Insights"
+    case gratitude = "Gratitude"
+    case habits = "Habits"
     
-    static let all = LocalFilterOption(id: "all", title: "All")
-    static let rejections = LocalFilterOption(id: "rejections", title: "Rejections")
-    static let insights = LocalFilterOption(id: "insights", title: "Insights")
-    static let gratitude = LocalFilterOption(id: "gratitude", title: "Gratitude")
-    static let habits = LocalFilterOption(id: "habits", title: "Habits")
+    // Conform to Identifiable using rawValue
+    var id: String { self.rawValue }
     
-    static var allCases: [LocalFilterOption] {
-        [.all, .rejections, .insights, .gratitude, .habits]
+    // Computed property for display title
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .rejections: return "Rejections"
+        case .insights: return "Insights"
+        case .gratitude: return "Gratitude"
+        case .habits: return "Habits"
+        }
     }
+    
+    // Equatable conformance is synthesized for simple enums
 }
 
 struct LocalFilterButton: View {

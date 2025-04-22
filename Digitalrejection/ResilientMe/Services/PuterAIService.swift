@@ -132,7 +132,7 @@ public class PuterAIService: NSObject, WKNavigationDelegate, WKScriptMessageHand
     }
     
     // Analyze mood patterns and return AI-generated recommendations
-    public func analyzeMoodPatterns(moodData: [MoodData], completion: @escaping (Result<String, Error>) -> Void) {
+    public func analyzeMoodPatterns(moodData: [ResilientMe.MoodData], completion: @escaping (Result<String, Error>) -> Void) {
         // Create a unique ID for this query
         queryCounter += 1
         let queryId = "query_\(queryCounter)"

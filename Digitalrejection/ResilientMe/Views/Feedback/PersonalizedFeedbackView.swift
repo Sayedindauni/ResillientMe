@@ -1062,7 +1062,7 @@ struct PersonalizedFeedbackView_Previews: PreviewProvider {
     static var previews: some View {
         // Use mock MoodAnalysisEngine
         let mockStore = MockMoodStore()
-        let analysisEngine = MoodAnalysisEngine(moodStore: mockStore)
+        let analysisEngine = MoodAnalysisEngine(moodStore: mockStore as! LocalMoodStoreProtocol)
         
         // Create a sample feedback data
         let sampleFeedback = FeedbackData(

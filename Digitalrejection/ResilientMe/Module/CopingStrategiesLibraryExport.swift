@@ -70,6 +70,17 @@ public enum ExportCopingStrategyCategory: String, CaseIterable, Identifiable, Co
     
     public var id: String { rawValue }
     
+    public var displayName: String {
+        switch self {
+        case .mindfulness: return "Mindfulness"
+        case .cognitive: return "Cognitive"
+        case .physical: return "Physical"
+        case .social: return "Social"
+        case .creative: return "Creative"
+        case .selfCare: return "Self-Care"
+        }
+    }
+    
     public var color: Color {
         switch self {
         case .mindfulness: return Color.blue
