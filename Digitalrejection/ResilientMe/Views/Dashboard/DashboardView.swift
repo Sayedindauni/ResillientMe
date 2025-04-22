@@ -496,11 +496,11 @@ struct MoodButton: View {
 }
 
 struct DashboardView: View {
+    @EnvironmentObject var moodStore: ResilientMe.CoreDataMoodStore
+    @EnvironmentObject var navigationCoordinator: NavigationCoordinator // Receive coordinator
     @State private var userName = "Friend"
     @State private var currentMood: DashboardMood = .neutral
     @State private var showMoodPicker = false
-    @State private var rejectionCount = 0
-    @State private var streakDays = 0
     @State private var showingTip = true
     @State private var currentTipTitle = ""
     @State private var currentTipDescription = ""
@@ -519,7 +519,7 @@ struct DashboardView: View {
     @State private var showingStreaksDetail = false
     @State private var showingAllStrategies = false
     @State private var selectedCategoryFilter: LocalCopingStrategyCategory?
-    
+//    
     // Define ResillienceActivity struct
     struct ResillienceActivity: Identifiable {
         let id = UUID()
@@ -530,6 +530,10 @@ struct DashboardView: View {
     
     @State private var selectedActivity: ResillienceActivity?
     @State private var selectedQuote: String = ""
+    
+    // States for save confirmation
+    @State private var showSaveConfirmation = false
+    @State private var savedEntryId: String? = nil
     
     init() {
         let strategy = getRandomCopingStrategy()
@@ -555,44 +559,128 @@ struct DashboardView: View {
     ]
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppLayout.spacing) {
-                // The AffirmationBanner is now shown above this view in ContentView
-                // Adjusted spacing to account for the banner above
-                
-                // Header with greeting and mood check-in
-                headerSection
-                    .padding(.top, 8) // Reduced top padding since AffirmationBanner is above
-                
-                // Stats section
-                statsSection
-                
-                // Daily coping tip
-                if showingTip {
-                    tipCard
+        ZStack(alignment: .bottom) { // Wrap in ZStack
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppLayout.spacing) {
+                    // The AffirmationBanner is now shown above this view in ContentView
+                    // Adjusted spacing to account for the banner above
+                    
+                    // Header with greeting and mood check-in
+                    headerSection
+                        .padding(.top, 8) // Reduced top padding since AffirmationBanner is above
+                    
+                    // Stats section
+                    statsSection
+                    
+                    // Daily coping tip
+                    if showingTip {
+                        tipCard
+                    }
+                    
+                    // Quick activities section
+                    activitiesSection
+                    
+                    // Coping Strategies Library section
+                    copingStrategiesSection
+                    
+                    // Resources section
+                    resourcesSection
+                    
+                    // Community section
+                    communitySection
                 }
-                
-                // Quick activities section
-                activitiesSection
-                
-                // Coping Strategies Library section
-                copingStrategiesSection
-                
-                // Resources section
-                resourcesSection
-                
-                // Community section
-                communitySection
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
-        }
-        .background(AppColors.background.edgesIgnoringSafeArea(.all))
-        .sheet(isPresented: $showMoodPicker) {
-            MoodPickerView(selectedMood: $currentMood) {
-                LocalHaptics.success()
-                announceToScreenReader("Mood updated to \(currentMood.name)")
+            .background(AppColors.background.edgesIgnoringSafeArea(.all))
+            .sheet(isPresented: $showMoodPicker) {
+                MoodPickerView(selectedMood: $currentMood) { // onSave closure starts here
+                    // Get the selected mood as a string
+                    let moodString = currentMood.rawValue
+                    
+                    // Create the MoodData object
+                    let newEntry = ResilientMe.MoodData(
+                        id: UUID().uuidString,
+                        date: Date(),
+                        mood: moodString,
+                        intensity: 3, // Default intensity for quick log
+                        note: nil,
+                        rejectionRelated: false,
+                        rejectionTrigger: nil,
+                        copingStrategy: nil,
+                        journalPromptShown: false,
+                        recommendedCopingStrategies: nil
+                    )
+                    
+                    // Save to CoreData
+                    moodStore.saveMoodEntry(entry: newEntry)
+                    
+                    // Provide feedback
+                    LocalHaptics.success()
+                    announceToScreenReader("Mood saved as \(moodString)")
+                    
+                    // Show confirmation message
+                    withAnimation {
+                        savedEntryId = newEntry.id
+                        showSaveConfirmation = true
+                    }
+                    
+                    // Hide confirmation after a few seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        withAnimation {
+                            showSaveConfirmation = false
+                        }
+                    }
+                    
+                    // Dismiss the sheet
+                    showMoodPicker = false
+                    
+                } // onSave closure ends here
+            }
+            
+            // Confirmation Message Overlay
+            if showSaveConfirmation {
+                confirmationMessageView
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onTapGesture { // Allow dismissing by tapping
+                        withAnimation {
+                            showSaveConfirmation = false
+                        }
+                    }
             }
         }
+        .animation(.easeInOut, value: showSaveConfirmation) // Animate appearance
+    }
+    
+    // Confirmation Message View Builder
+    @ViewBuilder
+    private var confirmationMessageView: some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+            Text("Mood saved!")
+                .font(.system(size: 14, weight: .medium))
+
+            Spacer()
+
+            Button("Add Details") {
+                if let entryId = savedEntryId {
+                     // Use the coordinator to navigate
+                     navigationCoordinator.navigateToJournal(editingEntryId: entryId)
+                     print("Navigate to Journal/Mood to edit entry ID: \(entryId)") // Keep print for debugging
+                     withAnimation {
+                         showSaveConfirmation = false // Dismiss confirmation
+                     }
+                }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(AppColors.primary)
+        }
+        .padding()
+        .background(Material.thick) // Use a blurred background
+        .cornerRadius(12)
+        .shadow(radius: 5)
+        .padding(.horizontal)
+        .padding(.bottom, 10) // Adjust bottom padding as needed
     }
     
     // MARK: - Header Section
@@ -645,7 +733,7 @@ struct DashboardView: View {
         HStack(spacing: 12) {
             // Rejections Processed Card
             StatsCard(
-                value: "\(rejectionCount)",
+                value: "\(moodStore.rejectionProcessedCount)", // REMOVED $ sign
                 label: "Rejections\nProcessed",
                 icon: "checkmark.shield",
                 color: AppColors.primary
@@ -653,13 +741,16 @@ struct DashboardView: View {
             
             // Current Streak Card
             StatsCard(
-                value: "\(streakDays)",
+                value: "\(moodStore.currentDayStreak)", // Use value from moodStore
                 label: "Day\nStreak",
                 icon: "flame",
                 color: AppColors.accent3
             )
         }
         .padding(.vertical, 8)
+        // Add onAppear if you need to trigger an initial fetch/recalculation
+        // or rely on the store updating itself when data changes
+        // .onAppear {\n        //     moodStore.fetchMoodEntries() // Example: Ensure data is fresh on appear\n        // }\n    }
     }
     
     // MARK: - Daily Tip Section

@@ -2,6 +2,7 @@ import Foundation
 import CoreData
 import SwiftUI
 import ResilientMe
+import Combine
 
 // MARK: - Define missing protocols and classes 
 
@@ -540,21 +541,38 @@ extension MoodStoreStrategyEffectiveness {
 class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
     @Published var moodEntries: [MoodData] = []
     @Published var recentMoods: [String] = []
+    @Published var rejectionProcessedCount: Int = 0
+    @Published var currentDayStreak: Int = 0
     private let context: NSManagedObjectContext
-    
+    private var cancellables = Set<AnyCancellable>()
+
     init(context: NSManagedObjectContext) {
         self.context = context
         fetchMoodEntries()
-        updateRecentMoods()
+        setupBindings()
     }
-    
+
+    private func setupBindings() {
+        print("Setting up bindings for CoreDataMoodStore...")
+        $moodEntries
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] entries in
+                print("MoodEntries changed, recalculating stats...")
+                self?.calculateRejectionCount(entries: entries)
+                self?.calculateDayStreak(entries: entries)
+                self?.updateRecentMoods(entries: entries)
+            }
+            .store(in: &cancellables)
+    }
+
     func fetchMoodEntries() {
+        print("Fetching mood entries...")
         let request = NSFetchRequest<MoodEntryEntity>(entityName: "MoodEntryEntity")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \MoodEntryEntity.date, ascending: false)]
-        
+
         do {
-            let entries = try context.fetch(request)
-            self.moodEntries = entries.map { entity in
+            let entities = try context.fetch(request)
+            self.moodEntries = entities.map { entity in
                 return MoodData(
                     id: entity.id ?? UUID().uuidString,
                     date: entity.date ?? Date(),
@@ -569,19 +587,25 @@ class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
                     recommendedCopingStrategies: entity.recommendedStrategies?.components(separatedBy: ",")
                 )
             }
-            updateRecentMoods()
+            print("Fetched \(self.moodEntries.count) mood entries.")
         } catch {
             print("Error fetching mood entries: \(error)")
+            self.moodEntries = []
+            self.rejectionProcessedCount = 0
+            self.currentDayStreak = 0
+            self.recentMoods = []
         }
     }
-    
-    private func updateRecentMoods() {
-        // Get the 5 most recent unique moods
-        let moods = moodEntries.prefix(20).map { $0.mood }
-        self.recentMoods = Array(Set(moods)).prefix(5).map { $0 }
+
+    private func updateRecentMoods(entries: [MoodData]) {
+        let moods = entries.prefix(20).map { $0.mood }
+        let uniqueMoods = Array(Set(moods))
+        self.recentMoods = Array(uniqueMoods.prefix(5))
+        print("Updated recent moods: \(self.recentMoods)")
     }
-    
+
     func saveMoodEntry(entry: MoodData) {
+        print("Saving mood entry: ID \(entry.id)")
         let newEntry = MoodEntryEntity(context: context)
         newEntry.id = entry.id
         newEntry.date = entry.date
@@ -594,25 +618,53 @@ class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
         newEntry.copingStrategy = entry.copingStrategy
         newEntry.journalPromptShown = entry.journalPromptShown
         newEntry.recommendedStrategies = entry.recommendedCopingStrategies?.joined(separator: ",")
-        
+
         do {
             try context.save()
+            print("Mood entry saved successfully. Fetching updates...")
             fetchMoodEntries()
-            print("Mood entry saved successfully")
         } catch {
             print("Error saving mood entry: \(error)")
         }
     }
-    
-    // Original method for backward compatibility
-    func saveMoodEntry(mood: String, intensity: Int, note: String? = nil, 
-                      rejectionRelated: Bool = false, rejectionTrigger: String? = nil, 
+
+    func updateMoodEntry(entry: ResilientMe.MoodData) {
+        print("Updating mood entry: ID \(entry.id)")
+        let request = NSFetchRequest<MoodEntryEntity>(entityName: "MoodEntryEntity")
+        request.predicate = NSPredicate(format: "id == %@", entry.id)
+        request.fetchLimit = 1
+
+        do {
+            let results = try context.fetch(request)
+            if let entityToUpdate = results.first {
+                entityToUpdate.date = entry.date
+                entityToUpdate.mood = entry.mood
+                entityToUpdate.intensity = Int16(entry.intensity)
+                entityToUpdate.note = entry.note
+                entityToUpdate.rejectionRelated = entry.rejectionRelated
+                entityToUpdate.rejectionTrigger = entry.rejectionTrigger
+                entityToUpdate.copingStrategy = entry.copingStrategy
+                entityToUpdate.journalPromptShown = entry.journalPromptShown
+                entityToUpdate.recommendedStrategies = entry.recommendedCopingStrategies?.joined(separator: ",")
+
+                try context.save()
+                print("Mood entry updated successfully. Fetching updates...")
+                fetchMoodEntries()
+            } else {
+                print("Error updating mood entry: ID \(entry.id) not found.")
+            }
+        } catch {
+            print("Error updating mood entry: \(error)")
+        }
+    }
+
+    func saveMoodEntry(mood: String, intensity: Int, note: String? = nil,
+                      rejectionRelated: Bool = false, rejectionTrigger: String? = nil,
                       copingStrategy: String? = nil) {
-        
-        // Generate recommended coping strategies based on mood and trigger
-        let recommendedStrategies = rejectionRelated ? 
+        print("Saving mood entry (legacy method)...")
+        let recommendedStrategies = rejectionRelated ?
             CopingStrategyCategories.recommendFor(mood: mood, trigger: rejectionTrigger) : nil
-        
+
         let newEntry = MoodEntryEntity(context: context)
         newEntry.id = UUID().uuidString
         newEntry.date = Date()
@@ -622,204 +674,209 @@ class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
         newEntry.rejectionRelated = rejectionRelated
         newEntry.rejectionTrigger = rejectionTrigger
         newEntry.copingStrategy = copingStrategy
-        newEntry.journalPromptShown = false // Initialize as not shown
+        newEntry.journalPromptShown = false
         newEntry.recommendedStrategies = recommendedStrategies?.joined(separator: ",")
-        
+
         do {
             try context.save()
+            print("Mood entry saved successfully (legacy). Fetching updates...")
             fetchMoodEntries()
-            print("Mood entry saved successfully")
         } catch {
-            print("Error saving mood entry: \(error)")
+            print("Error saving mood entry (legacy): \(error)")
         }
     }
-    
+
     func updateJournalPromptShown(id: String, shown: Bool) {
+        print("Updating journal prompt shown for ID \(id) to \(shown)")
         let request = NSFetchRequest<MoodEntryEntity>(entityName: "MoodEntryEntity")
         request.predicate = NSPredicate(format: "id == %@", id)
-        
+        request.fetchLimit = 1
+
         do {
             let entries = try context.fetch(request)
             if let entry = entries.first {
                 entry.journalPromptShown = shown
                 try context.save()
+                print("Journal prompt status updated. Fetching updates...")
                 fetchMoodEntries()
             }
         } catch {
             print("Error updating journal prompt status: \(error)")
         }
     }
-    
+
     func deleteMoodEntry(id: String) {
+        print("Deleting mood entry ID \(id)")
         let request = NSFetchRequest<MoodEntryEntity>(entityName: "MoodEntryEntity")
         request.predicate = NSPredicate(format: "id == %@", id)
-        
+        request.fetchLimit = 1
+
         do {
             let entries = try context.fetch(request)
             if let entry = entries.first {
                 context.delete(entry)
                 try context.save()
+                print("Mood entry deleted successfully. Fetching updates...")
                 fetchMoodEntries()
-                print("Mood entry deleted successfully")
             }
         } catch {
             print("Error deleting mood entry: \(error)")
         }
     }
-    
+
+    private func calculateRejectionCount(entries: [MoodData]) {
+        let count = entries.filter { $0.rejectionRelated }.count
+        if self.rejectionProcessedCount != count {
+            self.rejectionProcessedCount = count
+            print("Updated Rejection Count: \(count)")
+        }
+    }
+
+    private func calculateDayStreak(entries: [MoodData]) {
+        guard !entries.isEmpty else {
+            if self.currentDayStreak != 0 {
+                self.currentDayStreak = 0
+                print("Updated Day Streak: 0 (no entries)")
+            }
+            return
+        }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var streak = 0
+
+        let entryDays = Set(entries.compactMap { calendar.startOfDay(for: $0.date) })
+
+        var currentDayToCheck = today
+
+        while true {
+            if entryDays.contains(currentDayToCheck) {
+                streak += 1
+                guard let previousDay = calendar.date(byAdding: .day, value: -1, to: currentDayToCheck) else { break }
+                currentDayToCheck = previousDay
+            } else {
+                if currentDayToCheck == today {
+                    guard let yesterday = calendar.date(byAdding: .day, value: -1, to: currentDayToCheck) else { break }
+                    if entryDays.contains(yesterday) {
+                        streak += 1
+                        guard let dayBeforeYesterday = calendar.date(byAdding: .day, value: -1, to: yesterday) else { break }
+                        currentDayToCheck = dayBeforeYesterday
+                        continue
+                    }
+                }
+                break
+            }
+        }
+
+        if self.currentDayStreak != streak {
+            self.currentDayStreak = streak
+            print("Updated Day Streak: \(streak)")
+        }
+    }
+
     func getMoodEntriesForTimeframe(_ timeframe: MoodView.TimeFrame) -> [MoodData] {
         let calendar = Calendar.current
         let now = Date()
         let startDate: Date
-        
+
         switch timeframe {
         case .day:
             startDate = calendar.startOfDay(for: now)
         case .week:
-            if let date = calendar.date(byAdding: .day, value: -7, to: now) {
-                startDate = date
-            } else {
-                startDate = calendar.startOfDay(for: now)
-            }
+            startDate = calendar.date(byAdding: .day, value: -7, to: now) ?? calendar.startOfDay(for: now)
         case .month:
-            if let date = calendar.date(byAdding: .month, value: -1, to: now) {
-                startDate = date
-            } else {
-                startDate = calendar.startOfDay(for: now)
-            }
+            startDate = calendar.date(byAdding: .month, value: -1, to: now) ?? calendar.startOfDay(for: now)
         }
-        
         return moodEntries.filter { $0.date >= startDate }
     }
-    
-    // Get mood aggregates by category
+
     func getMoodDistribution(timeframe: MoodView.TimeFrame) -> [String: Int] {
         let entries = getMoodEntriesForTimeframe(timeframe)
         var distribution: [String: Int] = [:]
-        
         for entry in entries {
             let category = PredefinedMoods.categoryFor(mood: entry.mood)
             distribution[category, default: 0] += 1
         }
-        
         return distribution
     }
-    
-    // Get rejection trigger distribution
+
     func getRejectionTriggerDistribution(timeframe: MoodView.TimeFrame) -> [String: Int] {
         let entries = getMoodEntriesForTimeframe(timeframe).filter { $0.rejectionRelated && $0.rejectionTrigger != nil }
         var distribution: [String: Int] = [:]
-        
         for entry in entries {
             if let trigger = entry.rejectionTrigger {
                 let category = RejectionTriggers.categoryFor(trigger: trigger)
                 distribution[category, default: 0] += 1
             }
         }
-        
         return distribution
     }
-    
-    // Get the most effective coping strategies
+
     func getEffectiveCopingStrategies(timeframe: MoodView.TimeFrame) -> [String: Int] {
         let entries = getMoodEntriesForTimeframe(timeframe).filter { $0.copingStrategy != nil }
         var strategyCounts: [String: Int] = [:]
-        
         for entry in entries {
             if let strategy = entry.copingStrategy {
                 strategyCounts[strategy, default: 0] += 1
             }
         }
-        
         return strategyCounts
     }
-    
-    // Get total mood intensity average
+
     func getAverageIntensity(timeframe: MoodView.TimeFrame) -> Double {
         let entries = getMoodEntriesForTimeframe(timeframe)
         guard !entries.isEmpty else { return 0 }
-        
         let sum = entries.reduce(0) { $0 + $1.intensity }
         return Double(sum) / Double(entries.count)
     }
-    
-    // Get entries that might need journaling prompts
+
     func getEntriesNeedingJournalPrompts() -> [MoodData] {
         return moodEntries
-            .filter { entry -> Bool in 
-                // First priority: Negative moods related to rejection that haven't been prompted
-                if entry.rejectionRelated && 
-                   PredefinedMoods.negative.contains(entry.mood) && 
+            .filter { entry -> Bool in
+                if entry.rejectionRelated &&
+                   PredefinedMoods.negative.contains(entry.mood) &&
                    !entry.journalPromptShown {
                     return true
                 }
-                
-                // Second priority: Any high-intensity negative moods that haven't been prompted
-                if PredefinedMoods.negative.contains(entry.mood) && 
-                   entry.intensity >= 4 && 
+                if PredefinedMoods.negative.contains(entry.mood) &&
+                   entry.intensity >= 4 &&
                    !entry.journalPromptShown {
                     return true
                 }
-                
                 return false
             }
-            .sorted(by: { entry1, entry2 -> Bool in 
-                // Sort by: 1) Rejection-related first, 2) Higher intensity, 3) More recent
-                if entry1.rejectionRelated != entry2.rejectionRelated {
-                    return entry1.rejectionRelated
-                } else if entry1.intensity != entry2.intensity {
-                    return entry1.intensity > entry2.intensity
-                } else {
-                    return entry1.date > entry2.date
-                }
-            })
-            .prefix(3) // Limit to 3 most important entries
+            .sorted { entry1, entry2 -> Bool in
+                if entry1.rejectionRelated != entry2.rejectionRelated { return entry1.rejectionRelated }
+                else if entry1.intensity != entry2.intensity { return entry1.intensity > entry2.intensity }
+                else { return entry1.date > entry2.date }
+            }
+            .prefix(3)
             .map { $0 }
     }
-    
-    // Get a tailored journal prompt based on a specific mood entry
+
     func getJournalPromptFor(entry: MoodData) -> (String, String, [String]) {
-        // Generate an appropriate title based on the mood and trigger
         let title: String
         if entry.rejectionRelated, let trigger = entry.rejectionTrigger {
             title = "Reflection on \(trigger)"
         } else {
             title = "Reflection on feeling \(entry.mood)"
         }
-        
-        // Get the appropriate prompt content
         let promptContent = JournalPrompts.getPromptForMood(entry.mood, trigger: entry.rejectionTrigger)
-        
-        // Suggest appropriate tags
         var suggestedTags = ["Growth"]
-        if entry.rejectionRelated {
-            suggestedTags.append("Rejection")
-        }
-        if PredefinedMoods.negative.contains(entry.mood) {
-            suggestedTags.append("Insight")
-        }
-        
+        if entry.rejectionRelated { suggestedTags.append("Rejection") }
+        if PredefinedMoods.negative.contains(entry.mood) { suggestedTags.append("Insight") }
         return (title, promptContent, suggestedTags)
     }
-    
+
     func getMoodDistributionData() -> [ChartData] {
-        let moodCounts = moodEntries.reduce(into: [:]) { counts, entry in
-            counts[entry.mood, default: 0] += 1
-        }
-        
+        let moodCounts = moodEntries.reduce(into: [:]) { $0[$1.mood, default: 0] += 1 }
         let total = Double(moodEntries.count)
         let sortedMoods = moodCounts.sorted { $0.value > $1.value }
-        
         return sortedMoods.map { mood, count in
-            ChartData(
-                label: mood,
-                value: Double(count),
-                percentage: total > 0 ? (Double(count) / total) * 100 : 0
-            )
+            ChartData(label: mood, value: Double(count), percentage: total > 0 ? (Double(count) / total) * 100 : 0)
         }
     }
-    
-    // Convert CoreData MoodEntry to MoodData model
+
     func convertToMoodData(entry: MoodEntryEntity) -> MoodData {
         return MoodData(
             id: entry.id ?? UUID().uuidString,
@@ -827,42 +884,36 @@ class CoreDataMoodStore: ObservableObject, LocalMoodStoreProtocol {
             mood: entry.mood ?? "",
             customMood: nil,
             intensity: Int(entry.intensity),
-            note: nil,
-            rejectionRelated: false,
-            rejectionTrigger: nil,
-            copingStrategy: nil
+            note: entry.note,
+            rejectionRelated: entry.rejectionRelated,
+            rejectionTrigger: entry.rejectionTrigger,
+            copingStrategy: entry.copingStrategy,
+            journalPromptShown: entry.journalPromptShown,
+            recommendedCopingStrategies: entry.recommendedStrategies?.components(separatedBy: ",")
         )
     }
 }
 
 // MARK: - CoreDataMoodStore Extension for StrategyEffectivenessStore integration
-
-// Extension to CoreDataMoodStore that integrates with MoodStoreStrategyEffectiveness
 extension CoreDataMoodStore {
-    // Access the shared MoodStoreStrategyEffectiveness
     var strategyStore: MoodStoreStrategyEffectiveness { MoodStoreStrategyEffectiveness.shared }
-    
-    // Delegate to MoodStoreStrategyEffectiveness's getCompletionCount
+
     func getCompletionCount(for strategy: String) -> Int {
         return strategyStore.getCompletionCount(for: strategy)
     }
-    
-    // Delegate to MoodStoreStrategyEffectiveness's getAverageRating
+
     func getAverageRating(for strategy: String) -> Double {
         return strategyStore.getAverageRating(for: strategy)
     }
-    
-    // Delegate to MoodStoreStrategyEffectiveness's getMostEffectiveStrategies
+
     func getMostEffectiveStrategies() -> [(strategy: String, rating: Double)] {
         return strategyStore.getMostEffectiveStrategies()
     }
-    
-    // Delegate to MoodStoreStrategyEffectiveness's getMostUsedStrategies
+
     func getMostUsedStrategies() -> [(strategy: String, count: Int)] {
         return strategyStore.getMostUsedStrategies()
     }
-    
-    // Delegate to MoodStoreStrategyEffectiveness's getRatingHistory
+
     func getRatingHistory(for strategy: String) -> [(date: Date, rating: Int)] {
         return strategyStore.getRatingHistory(for: strategy)
     }

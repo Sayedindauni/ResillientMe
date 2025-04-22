@@ -25,7 +25,7 @@ struct ContentView: View {
     @State private var dailyAffirmation = LocalAppCopy.randomAffirmation()
     @StateObject private var moodStore: ResilientMe.CoreDataMoodStore
     @StateObject private var moodAnalysisEngine: ResilientMe.MoodAnalysisEngine
-    @State private var selectedTab = 0
+    @StateObject private var navigationCoordinator = NavigationCoordinator()
     
     // Add initializer to accept context parameter
     init(context: NSManagedObjectContext) {
@@ -37,8 +37,10 @@ struct ContentView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $navigationCoordinator.selectedTab) {
             DashboardView()
+                .environmentObject(moodStore)
+                .environmentObject(navigationCoordinator)
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
@@ -46,7 +48,10 @@ struct ContentView: View {
                 .tag(0)
             
             // Combined MoodJournalView replacing separate Journal and Mood tabs
-            MoodJournalView(context: viewContext, moodAnalysisEngine: moodAnalysisEngine)
+            MoodJournalView(moodAnalysisEngine: moodAnalysisEngine)
+                .environmentObject(navigationCoordinator)
+                .environmentObject(moodStore)
+                .environmentObject(moodAnalysisEngine)
                 .tabItem {
                     Image(systemName: "book.fill")
                     Text("Journal & Mood")

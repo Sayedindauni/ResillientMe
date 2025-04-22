@@ -7,8 +7,9 @@ import Charts
 
 struct MoodJournalView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var navigationCoordinator: NavigationCoordinator
     @ObservedObject var moodAnalysisEngine: ResilientMe.MoodAnalysisEngine
-    @StateObject private var moodStore: ResilientMe.CoreDataMoodStore
+    @EnvironmentObject var moodStore: ResilientMe.CoreDataMoodStore
     
     // Shared state
     @State private var activeTab: ViewTab = .journal
@@ -20,14 +21,13 @@ struct MoodJournalView: View {
     @State private var searchText = ""
     @State private var filterOption: LocalFilterOption = .all
     
-    // Mood states
-    @State private var selectedMood: String?
-    @State private var moodIntensity: Int = 3
-    @State private var moodNote: String = ""
-    @State private var isRejectionRelated: Bool = false
-    @State private var rejectionTrigger: String = ""
-    @State private var showingHistory: Bool = false
-    @State private var showingInsights: Bool = false
+    // Mood states (used for the form)
+    @State private var formSelectedMood: String? = nil
+    @State private var formMoodIntensity: Int = 3
+    @State private var formMoodNote: String = ""
+    @State private var formIsRejectionRelated: Bool = false
+    @State private var formRejectionTrigger: String = ""
+    @State private var editingEntryId: String? = nil
     
     // Enum for internal tab switching
     enum ViewTab {
@@ -35,12 +35,6 @@ struct MoodJournalView: View {
         case mood
         case history
         case insights
-    }
-    
-    // Initializer with context
-    init(context: NSManagedObjectContext, moodAnalysisEngine: ResilientMe.MoodAnalysisEngine) {
-        self.moodAnalysisEngine = moodAnalysisEngine
-        self._moodStore = StateObject(wrappedValue: ResilientMe.CoreDataMoodStore(context: context))
     }
     
     var body: some View {
@@ -70,7 +64,11 @@ struct MoodJournalView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showAddNewEntry = true }) {
+                    Button(action: {
+                        editingEntryId = nil
+                        resetMoodForm()
+                        showAddNewEntry = true
+                    }) {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
                     }
@@ -83,6 +81,7 @@ struct MoodJournalView: View {
                         if let newEntry = newEntry {
                             journalEntries.insert(newEntry, at: 0)
                         }
+                        editingEntryId = nil
                     }
                 } else {
                     quickMoodEntrySheet
@@ -96,6 +95,11 @@ struct MoodJournalView: View {
                     }
                 }
             }
+        }
+        .onAppear(perform: loadEntryForEditing)
+        .onChange(of: navigationCoordinator.journalEditingEntryId) { _ in
+            print("Coordinator ID changed, attempting load...")
+            loadEntryForEditing()
         }
     }
     
@@ -203,7 +207,7 @@ struct MoodJournalView: View {
             .padding(.horizontal)
             
             // Intensity slider (only if mood is selected)
-            if selectedMood != nil {
+            if formSelectedMood != nil {
                 VStack(spacing: 8) {
                     Text("How intense is this feeling?")
                         .font(.headline)
@@ -214,8 +218,8 @@ struct MoodJournalView: View {
                             .foregroundColor(.gray)
                         
                         Slider(value: Binding(
-                            get: { Double(moodIntensity) },
-                            set: { moodIntensity = Int($0) }
+                            get: { Double(formMoodIntensity) },
+                            set: { formMoodIntensity = Int($0) }
                         ), in: 1...5, step: 1)
                         .accentColor(.blue)
                         
@@ -224,7 +228,7 @@ struct MoodJournalView: View {
                             .foregroundColor(.gray)
                     }
                     
-                    Text("Intensity: \(moodIntensity)")
+                    Text("Intensity: \(formMoodIntensity)")
                         .font(.callout)
                         .foregroundColor(.gray)
                 }
@@ -234,7 +238,7 @@ struct MoodJournalView: View {
                 .padding(.horizontal)
                 
                 // Rejection related
-                Toggle(isOn: $isRejectionRelated) {
+                Toggle(isOn: $formIsRejectionRelated) {
                     Text("Is this related to rejection?")
                         .font(.headline)
                 }
@@ -248,7 +252,7 @@ struct MoodJournalView: View {
                     Text("Add a note (optional)")
                         .font(.headline)
                     
-                    TextEditor(text: $moodNote)
+                    TextEditor(text: $formMoodNote)
                         .frame(minHeight: 100)
                         .padding(8)
                         .background(Color(.systemGray6).opacity(0.5))
@@ -435,14 +439,14 @@ struct MoodJournalView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(width: 80, height: 80)
-        .background(selectedMood == mood ? Color.blue.opacity(0.1) : Color.clear)
+        .background(formSelectedMood == mood ? Color.blue.opacity(0.1) : Color.clear)
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(selectedMood == mood ? Color.blue : Color.clear, lineWidth: 2)
+                .stroke(formSelectedMood == mood ? Color.blue : Color.clear, lineWidth: 2)
         )
         .onTapGesture {
-            selectedMood = mood
+            formSelectedMood = mood
         }
     }
     
@@ -460,7 +464,7 @@ struct MoodJournalView: View {
             }
             .padding(.horizontal)
             
-            if selectedMood != nil {
+            if formSelectedMood != nil {
                 VStack(spacing: 16) {
                     // Intensity
                     HStack {
@@ -468,12 +472,12 @@ struct MoodJournalView: View {
                             .font(.headline)
                         
                         Slider(value: Binding(
-                            get: { Double(moodIntensity) },
-                            set: { moodIntensity = Int($0) }
+                            get: { Double(formMoodIntensity) },
+                            set: { formMoodIntensity = Int($0) }
                         ), in: 1...5, step: 1)
                         .accentColor(.blue)
                         
-                        Text("\(moodIntensity)")
+                        Text("\(formMoodIntensity)")
                             .frame(width: 25)
                     }
                     
@@ -597,76 +601,121 @@ struct MoodJournalView: View {
     }
     
     private func saveMoodEntry() {
-        guard let mood = selectedMood else { return }
+        guard let mood = formSelectedMood else { return }
         
-        // Save mood entry to mood store
-        let entry = ResilientMe.MoodData(
-            id: UUID().uuidString,
-            date: Date(),
-            mood: mood,
-            intensity: moodIntensity,
-            note: moodNote.isEmpty ? nil : moodNote
-        )
+        if let currentEditingId = editingEntryId {
+            // --- UPDATE existing entry --- 
+            let updatedEntryData = ResilientMe.MoodData(
+                id: currentEditingId,
+                date: Date(),
+                mood: mood,
+                intensity: formMoodIntensity,
+                note: formMoodNote.isEmpty ? nil : formMoodNote,
+                rejectionRelated: formIsRejectionRelated,
+                rejectionTrigger: formIsRejectionRelated ? formRejectionTrigger : nil
+            )
+            
+            // !!! IMPORTANT: You MUST implement updateMoodEntry in CoreDataMoodStore !!!
+            // moodStore.updateMoodEntry(entry: updatedEntryData) // Commented out until implemented
+            print("--- UPDATE LOGIC NEEDED in CoreDataMoodStore for ID: \(currentEditingId) ---")
+            print("MoodJournalView: Would update entry ID: \(currentEditingId) with mood \(mood)")
+            
+        } else {
+            // --- CREATE new entry --- 
+            let newEntry = ResilientMe.MoodData(
+                id: UUID().uuidString,
+                date: Date(),
+                mood: mood,
+                intensity: formMoodIntensity,
+                note: formMoodNote.isEmpty ? nil : formMoodNote,
+                rejectionRelated: formIsRejectionRelated,
+                rejectionTrigger: formIsRejectionRelated ? formRejectionTrigger : nil
+            )
+            moodStore.saveMoodEntry(entry: newEntry)
+            print("MoodJournalView: Saved new entry ID \(newEntry.id)")
+        }
         
-        // Explicitly call the method on the object
-        moodStore.saveMoodEntry(entry: entry)
-        
-        // Reset the form
         resetMoodForm()
     }
     
     private func addMoodAndPromptForJournal() {
-        guard let mood = selectedMood else { return }
+        guard let mood = formSelectedMood else { return }
+        var entryToUseForPrompt: ResilientMe.MoodData? = nil
         
-        // Save the basic mood entry first
-        let entry = ResilientMe.MoodData(
-            id: UUID().uuidString,
-            date: Date(),
-            mood: mood,
-            intensity: moodIntensity,
-            note: moodNote.isEmpty ? nil : moodNote,
-            rejectionRelated: isRejectionRelated,
-            rejectionTrigger: isRejectionRelated ? rejectionTrigger : nil
-        )
+        if let currentEditingId = editingEntryId {
+            // --- UPDATE existing entry before prompting --- 
+            let updatedEntryData = ResilientMe.MoodData(
+                id: currentEditingId,
+                date: Date(),
+                mood: mood,
+                intensity: formMoodIntensity,
+                note: formMoodNote.isEmpty ? nil : formMoodNote,
+                rejectionRelated: formIsRejectionRelated,
+                rejectionTrigger: formIsRejectionRelated ? formRejectionTrigger : nil
+            )
+            
+            // !!! IMPORTANT: You MUST implement updateMoodEntry in CoreDataMoodStore !!!
+            // moodStore.updateMoodEntry(entry: updatedEntryData) // Commented out until implemented
+            print("--- UPDATE LOGIC NEEDED in CoreDataMoodStore for ID: \(currentEditingId) ---")
+            print("MoodJournalView: Would update entry ID \(currentEditingId) before prompting journal.")
+            entryToUseForPrompt = updatedEntryData
+            
+        } else {
+            // --- CREATE new entry before prompting --- 
+            let newEntry = ResilientMe.MoodData(
+                id: UUID().uuidString,
+                date: Date(),
+                mood: mood,
+                intensity: formMoodIntensity,
+                note: formMoodNote.isEmpty ? nil : formMoodNote,
+                rejectionRelated: formIsRejectionRelated,
+                rejectionTrigger: formIsRejectionRelated ? formRejectionTrigger : nil
+            )
+            moodStore.saveMoodEntry(entry: newEntry)
+            print("MoodJournalView: Saved new entry ID \(newEntry.id) before prompting journal.")
+            entryToUseForPrompt = newEntry
+        }
         
-        // Explicitly call the method on the object
-        moodStore.saveMoodEntry(entry: entry)
+        if let entryData = entryToUseForPrompt {
+            prepareJournalPrompt(for: entryData)
+        } else {
+            print("Error: Could not get entry data to prepare journal prompt.")
+        }
         
-        // Prepare for journal entry
-        // Use the saved MoodData to potentially generate a relevant prompt
-        let (title, prompt, tags) = moodStore.getJournalPromptFor(entry: entry)
-        
-        // Show the Journal Entry Editor
-        let newJournalEntry = JournalEntryModel(
-            id: UUID().uuidString, // Generate a new ID for the journal entry
-            date: Date(),
-            title: title,
-            content: "", // Start with empty content
-            tags: tags,
-            mood: JournalMood(rawValue: mood) ?? .neutral, // Map mood string
-            moodIntensity: moodIntensity
-        )
-        
-        // Use the correct initializer for JournalEntryEditorView
-        showAddNewEntry = false // Dismiss mood sheet first if needed
-        selectedEntry = newJournalEntry // Set state to trigger sheet
-        // Need to pass the prompt to the editor
-        // For now, pass the generated prompt directly
-        // showJournalEditor(entry: newJournalEntry, initialPrompt: prompt)
-        
-        // TODO: Refactor to show the journal editor modally, passing the prompt
-        print("Prompting user to add journal entry for mood: \(mood)")
-        
-        // Reset mood form after saving and preparing journal
         resetMoodForm()
     }
     
+    private func prepareJournalPrompt(for entry: ResilientMe.MoodData) {
+        let (title, prompt, tags) = moodStore.getJournalPromptFor(entry: entry)
+        let newJournalEntryModel = JournalEntryModel(
+            id: UUID().uuidString,
+            date: Date(),
+            title: title,
+            content: "",
+            tags: tags,
+            mood: JournalMood(rawValue: entry.mood) ?? .neutral,
+            moodIntensity: entry.intensity
+        )
+        print("MoodJournalView: Preparing journal prompt: \(prompt)")
+        selectedEntry = newJournalEntryModel
+        
+        // Potential Fix: Add a specific state to show the editor
+        // @State private var showingJournalEditor = false
+        // @State private var journalEditorModel: JournalEntryModel? = nil
+        // ... in prepareJournalPrompt ...
+        // self.journalEditorModel = newJournalEntryModel
+        // self.showingJournalEditor = true
+        // ... update sheet modifier to use .sheet(isPresented: $showingJournalEditor) ...
+    }
+    
     private func resetMoodForm() {
-        selectedMood = nil
-        moodIntensity = 3
-        moodNote = ""
-        isRejectionRelated = false
-        rejectionTrigger = ""
+        print("Resetting mood form.")
+        formSelectedMood = nil
+        formMoodIntensity = 3
+        formMoodNote = ""
+        formIsRejectionRelated = false
+        formRejectionTrigger = ""
+        editingEntryId = nil
     }
     
     private func generateJournalPrompt(for mood: String, intensity: Int, isRejectionRelated: Bool) -> String {
@@ -787,6 +836,42 @@ struct MoodJournalView: View {
         
         // Sort by date (most recent first)
         return entries.sorted(by: { $0.date > $1.date })
+    }
+    
+    // Function to load entry data into form state
+    private func loadEntryForEditing() {
+        guard let entryId = navigationCoordinator.journalEditingEntryId else {
+            print("loadEntryForEditing: No editing ID provided.")
+            if activeTab == .mood {
+                // resetMoodForm()
+            }
+            return
+        }
+        
+        print("loadEntryForEditing: Loading entry ID: \(entryId)")
+        if let entryToEdit = moodStore.moodEntries.first(where: { $0.id == entryId }) {
+            print("loadEntryForEditing: Found entry: \(entryToEdit.mood)")
+            formSelectedMood = entryToEdit.mood
+            formMoodIntensity = entryToEdit.intensity
+            formMoodNote = entryToEdit.note ?? ""
+            formIsRejectionRelated = entryToEdit.rejectionRelated
+            formRejectionTrigger = entryToEdit.rejectionTrigger ?? ""
+            editingEntryId = entryId
+            
+            activeTab = .mood
+            
+            DispatchQueue.main.async {
+                print("loadEntryForEditing: Clearing coordinator ID.")
+                navigationCoordinator.clearJournalEdit()
+            }
+            
+        } else {
+            print("MoodJournalView: Entry ID \(entryId) not found in moodStore.moodEntries.")
+            DispatchQueue.main.async {
+                navigationCoordinator.clearJournalEdit()
+            }
+            resetMoodForm()
+        }
     }
 }
 
